@@ -1,4 +1,5 @@
 process = global.process
+events  = require 'events'
 path    = require 'path'
 url     = require 'url'
 Module  = require 'module'
@@ -19,7 +20,11 @@ globalPaths.push path.join(process.resourcesPath, 'atom', 'renderer', 'api', 'li
 globalPaths.push path.join(process.resourcesPath, 'app')
 
 # Import common settings.
-require path.resolve(__dirname, '..', '..', 'common', 'lib', 'init.js')
+require path.resolve(__dirname, '..', '..', 'common', 'lib', 'init')
+
+# The global variable will be used by ipc for event dispatching
+v8Util = process.atomBinding 'v8_util'
+v8Util.setHiddenValue global, 'ipc', new events.EventEmitter
 
 # Process command line arguments.
 nodeIntegration = 'false'
@@ -55,8 +60,8 @@ if nodeIntegration in ['true', 'all', 'except-iframe', 'manual-enable-iframe']
   global.require = require
   global.module = module
 
-  # Set the __filename to the path of html file if it's file: or asar: protocol.
-  if window.location.protocol in ['file:', 'asar:']
+  # Set the __filename to the path of html file if it is file: protocol.
+  if window.location.protocol is 'file:'
     pathname =
       if process.platform is 'win32' and window.location.pathname[0] is '/'
         window.location.pathname.substr 1
@@ -86,9 +91,12 @@ if nodeIntegration in ['true', 'all', 'except-iframe', 'manual-enable-iframe']
   window.addEventListener 'unload', ->
     process.emit 'exit'
 else
-  # There still some native initialization codes needs "process", delete the
-  # global reference after they are done.
-  process.once 'BIND_DONE', ->
+  # The Module.runMain will run process._tickCallck() immediately, so we are
+  # able to delete the symbols in this tick even though we used process.nextTick
+  # to schedule it.
+  # It is important that we put this in process.nextTick, if we delete them now
+  # some code in node.js will complain about "process not defined".
+  process.nextTick ->
     delete global.process
     delete global.setImmediate
     delete global.clearImmediate

@@ -8,8 +8,9 @@
 #include <vector>
 
 #include "atom/common/api/api_messages.h"
+#include "atom/common/native_mate_converters/string16_converter.h"
+#include "atom/common/native_mate_converters/value_converter.h"
 #include "atom/common/options_switches.h"
-#include "atom/renderer/api/atom_renderer_bindings.h"
 #include "atom/renderer/atom_renderer_client.h"
 #include "base/command_line.h"
 #include "base/strings/string_number_conversions.h"
@@ -19,19 +20,43 @@
 #include "third_party/WebKit/public/web/WebDocument.h"
 #include "third_party/WebKit/public/web/WebFrame.h"
 #include "third_party/WebKit/public/web/WebLocalFrame.h"
+#include "third_party/WebKit/public/web/WebKit.h"
 #include "third_party/WebKit/public/web/WebView.h"
 
 #include "atom/common/node_includes.h"
 
-using blink::WebFrame;
-
 namespace atom {
+
+namespace {
+
+bool GetIPCObject(v8::Isolate* isolate,
+                  v8::Handle<v8::Context> context,
+                  v8::Handle<v8::Object>* ipc) {
+  v8::Handle<v8::String> key = mate::StringToV8(isolate, "ipc");
+  v8::Handle<v8::Value> value = context->Global()->GetHiddenValue(key);
+  if (value.IsEmpty() || !value->IsObject())
+    return false;
+  *ipc = value->ToObject();
+  return true;
+}
+
+std::vector<v8::Handle<v8::Value>> ListValueToVector(
+    v8::Isolate* isolate,
+    const base::ListValue& list) {
+  v8::Handle<v8::Value> array = mate::ConvertToV8(isolate, list);
+  std::vector<v8::Handle<v8::Value>> result;
+  mate::ConvertFromV8(isolate, array, &result);
+  return result;
+}
+
+}  // namespace
 
 AtomRenderViewObserver::AtomRenderViewObserver(
     content::RenderView* render_view,
     AtomRendererClient* renderer_client)
     : content::RenderViewObserver(render_view),
-      renderer_client_(renderer_client) {
+      renderer_client_(renderer_client),
+      document_created_(false) {
 }
 
 AtomRenderViewObserver::~AtomRenderViewObserver() {
@@ -39,6 +64,8 @@ AtomRenderViewObserver::~AtomRenderViewObserver() {
 
 void AtomRenderViewObserver::DidCreateDocumentElement(
     blink::WebLocalFrame* frame) {
+  document_created_ = true;
+
   // Read --zoom-factor from command line.
   std::string zoom_factor_str = CommandLine::ForCurrentProcess()->
       GetSwitchValueASCII(switches::kZoomFactor);;
@@ -76,8 +103,29 @@ bool AtomRenderViewObserver::OnMessageReceived(const IPC::Message& message) {
 
 void AtomRenderViewObserver::OnBrowserMessage(const base::string16& channel,
                                               const base::ListValue& args) {
-  renderer_client_->atom_bindings()->OnBrowserMessage(
-      render_view(), channel, args);
+  if (!document_created_)
+    return;
+
+  if (!render_view()->GetWebView())
+    return;
+
+  blink::WebFrame* frame = render_view()->GetWebView()->mainFrame();
+  if (!frame || frame->isWebRemoteFrame())
+    return;
+
+  v8::Isolate* isolate = blink::mainThreadIsolate();
+  v8::HandleScope handle_scope(isolate);
+
+  v8::Local<v8::Context> context = frame->mainWorldScriptContext();
+  v8::Context::Scope context_scope(context);
+
+  std::vector<v8::Handle<v8::Value>> arguments = ListValueToVector(
+      isolate, args);
+  arguments.insert(arguments.begin(), mate::ConvertToV8(isolate, channel));
+
+  v8::Handle<v8::Object> ipc;
+  if (GetIPCObject(isolate, context, &ipc))
+    node::MakeCallback(isolate, ipc, "emit", arguments.size(), &arguments[0]);
 }
 
 }  // namespace atom
