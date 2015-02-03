@@ -17,7 +17,14 @@ ScopedTemporaryFile::ScopedTemporaryFile() {
 ScopedTemporaryFile::~ScopedTemporaryFile() {
   if (!path_.empty()) {
     base::ThreadRestrictions::ScopedAllowIO allow_io;
+    // On Windows it is very likely the file is already in use (because it is
+    // mostly used for Node native modules), so deleting it now will halt the
+    // program.
+#if defined(OS_WIN)
+    base::DeleteFileAfterReboot(path_);
+#else
     base::DeleteFile(path_, false);
+#endif
   }
 }
 
