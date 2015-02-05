@@ -24,3 +24,10 @@ contains documents describing how to build and contribute to atom-shell.
 
 There is an [`atom-shell` category on the Atom forums](http://discuss.atom.io/category/atom-shell)
 as well as an `#atom-shell` channel on Freenode.
+
+## Build Fire-shell
+
+- https://github.com/atom/atom-shell/blob/master/docs/development/build-instructions-windows.md
+- https://github.com/atom/atom-shell/issues/713
+- https://github.com/atom/atom-shell/pull/826
+- Recommended commandline tool: http://bliker.github.io/cmder/
