@@ -12,7 +12,7 @@ process.atomBinding = (name) ->
 
 # Add common/api/lib to module search paths.
 globalPaths = Module.globalPaths
-globalPaths.push path.join(process.resourcesPath, 'atom', 'common', 'api', 'lib')
+globalPaths.push path.resolve(__dirname, '..', 'api', 'lib')
 
 # setImmediate and process.nextTick makes use of uv_check and uv_prepare to
 # run the callbacks, however since we only run uv loop on requests, the
@@ -35,21 +35,3 @@ global.clearImmediate = timers.clearImmediate
 if process.type is 'browser'
   global.setTimeout = wrapWithActivateUvLoop timers.setTimeout
   global.setInterval = wrapWithActivateUvLoop timers.setInterval
-
-# Add support for asar packages.
-asar = require './asar'
-asar.wrapFsWithAsar fs
-
-# Make graceful-fs work with asar.
-source = process.binding 'natives'
-source.originalFs = source.fs
-source.fs = """
-  var src = '(function (exports, require, module, __filename, __dirname) { ' +
-            process.binding('natives').originalFs +
-            ' });';
-  var vm = require('vm');
-  var fn = vm.runInThisContext(src, { filename: 'fs.js' });
-  fn(exports, require, module);
-  var asar = require(#{JSON.stringify(__dirname)} + '/asar');
-  asar.wrapFsWithAsar(exports);
-"""

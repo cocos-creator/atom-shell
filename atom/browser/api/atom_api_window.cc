@@ -9,6 +9,7 @@
 #include "atom/browser/native_window.h"
 #include "atom/common/native_mate_converters/gfx_converter.h"
 #include "atom/common/native_mate_converters/gurl_converter.h"
+#include "atom/common/native_mate_converters/image_converter.h"
 #include "atom/common/native_mate_converters/string16_converter.h"
 #include "content/public/browser/render_process_host.h"
 #include "native_mate/callback.h"
@@ -51,15 +52,11 @@ namespace {
 
 void OnCapturePageDone(
     v8::Isolate* isolate,
-    const base::Callback<void(v8::Handle<v8::Value>)>& callback,
+    const base::Callback<void(const gfx::Image&)>& callback,
     const std::vector<unsigned char>& data) {
   v8::Locker locker(isolate);
   v8::HandleScope handle_scope(isolate);
-
-  v8::Local<v8::Value> buffer = node::Buffer::New(
-      reinterpret_cast<const char*>(data.data()),
-      data.size());
-  callback.Run(buffer);
+  callback.Run(gfx::Image::CreateFrom1xPNGBytes(&data.front(), data.size()));
 }
 
 }  // namespace
@@ -373,7 +370,7 @@ bool Window::IsDocumentEdited() {
 
 void Window::CapturePage(mate::Arguments* args) {
   gfx::Rect rect;
-  base::Callback<void(v8::Handle<v8::Value>)> callback;
+  base::Callback<void(const gfx::Image&)> callback;
 
   if (!(args->Length() == 1 && args->GetNext(&callback)) &&
       !(args->Length() == 2 && args->GetNext(&rect)
@@ -398,6 +395,11 @@ void Window::Print(mate::Arguments* args) {
 
 void Window::SetProgressBar(double progress) {
   window_->SetProgressBar(progress);
+}
+
+void Window::SetOverlayIcon(const gfx::Image& overlay,
+                            const std::string& description) {
+  window_->SetOverlayIcon(overlay, description);
 }
 
 void Window::SetAutoHideMenuBar(bool auto_hide) {
@@ -487,6 +489,7 @@ void Window::BuildPrototype(v8::Isolate* isolate,
       .SetMethod("capturePage", &Window::CapturePage)
       .SetMethod("print", &Window::Print)
       .SetMethod("setProgressBar", &Window::SetProgressBar)
+      .SetMethod("setOverlayIcon", &Window::SetOverlayIcon)
       .SetMethod("setAutoHideMenuBar", &Window::SetAutoHideMenuBar)
       .SetMethod("isMenuBarAutoHide", &Window::IsMenuBarAutoHide)
       .SetMethod("setMenuBarVisibility", &Window::SetMenuBarVisibility)

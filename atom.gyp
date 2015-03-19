@@ -38,10 +38,10 @@
       'atom/common/api/lib/clipboard.coffee',
       'atom/common/api/lib/crash-reporter.coffee',
       'atom/common/api/lib/id-weak-map.coffee',
+      'atom/common/api/lib/native-image.coffee',
       'atom/common/api/lib/original-fs.coffee',
       'atom/common/api/lib/shell.coffee',
       'atom/common/lib/init.coffee',
-      'atom/common/lib/asar.coffee',
       'atom/renderer/lib/chrome-api.coffee',
       'atom/renderer/lib/init.coffee',
       'atom/renderer/lib/inspector.coffee',
@@ -55,12 +55,18 @@
       'atom/renderer/api/lib/screen.coffee',
       'atom/renderer/api/lib/web-frame.coffee',
     ],
+    'coffee2c_sources': [
+      'atom/common/lib/asar.coffee',
+      'atom/common/lib/asar_init.coffee',
+    ],
     'lib_sources': [
       'atom/app/atom_content_client.cc',
       'atom/app/atom_content_client.h',
       'atom/app/atom_main_delegate.cc',
       'atom/app/atom_main_delegate.h',
       'atom/app/atom_main_delegate_mac.mm',
+      'atom/app/node_main.cc',
+      'atom/app/node_main.h',
       'atom/browser/api/atom_api_app.cc',
       'atom/browser/api/atom_api_app.h',
       'atom/browser/api/atom_api_auto_updater.cc',
@@ -85,6 +91,7 @@
       'atom/browser/api/atom_api_tray.h',
       'atom/browser/api/atom_api_web_contents.cc',
       'atom/browser/api/atom_api_web_contents.h',
+      'atom/browser/api/atom_api_web_view_manager.cc',
       'atom/browser/api/atom_api_window.cc',
       'atom/browser/api/atom_api_window.h',
       'atom/browser/api/event.cc',
@@ -109,6 +116,8 @@
       'atom/browser/atom_browser_main_parts_mac.mm',
       'atom/browser/atom_javascript_dialog_manager.cc',
       'atom/browser/atom_javascript_dialog_manager.h',
+      'atom/browser/atom_resource_dispatcher_host_delegate.cc',
+      'atom/browser/atom_resource_dispatcher_host_delegate.h',
       'atom/browser/atom_speech_recognition_manager_delegate.cc',
       'atom/browser/atom_speech_recognition_manager_delegate.h',
       'atom/browser/browser.cc',
@@ -187,10 +196,8 @@
       'atom/browser/ui/x/window_state_watcher.h',
       'atom/browser/ui/x/x_window_utils.cc',
       'atom/browser/ui/x/x_window_utils.h',
-      'atom/browser/web_view/web_view_manager.cc',
-      'atom/browser/web_view/web_view_manager.h',
-      'atom/browser/web_view/web_view_renderer_state.cc',
-      'atom/browser/web_view/web_view_renderer_state.h',
+      'atom/browser/web_view_manager.cc',
+      'atom/browser/web_view_manager.h',
       'atom/browser/web_dialog_helper.cc',
       'atom/browser/web_dialog_helper.h',
       'atom/browser/window_list.cc',
@@ -202,6 +209,9 @@
       'atom/common/api/atom_api_crash_reporter.cc',
       'atom/common/api/atom_api_id_weak_map.cc',
       'atom/common/api/atom_api_id_weak_map.h',
+      'atom/common/api/atom_api_native_image.cc',
+      'atom/common/api/atom_api_native_image.h',
+      'atom/common/api/atom_api_native_image_mac.mm',
       'atom/common/api/atom_api_shell.cc',
       'atom/common/api/atom_api_v8_util.cc',
       'atom/common/api/atom_bindings.cc',
@@ -210,6 +220,8 @@
       'atom/common/api/object_life_monitor.h',
       'atom/common/asar/archive.cc',
       'atom/common/asar/archive.h',
+      'atom/common/asar/asar_util.cc',
+      'atom/common/asar/asar_util.h',
       'atom/common/asar/scoped_temporary_file.cc',
       'atom/common/asar/scoped_temporary_file.h',
       'atom/common/common_message_generator.cc',
@@ -240,7 +252,6 @@
       'atom/common/native_mate_converters/gurl_converter.h',
       'atom/common/native_mate_converters/image_converter.cc',
       'atom/common/native_mate_converters/image_converter.h',
-      'atom/common/native_mate_converters/image_converter_mac.mm',
       'atom/common/native_mate_converters/string16_converter.h',
       'atom/common/native_mate_converters/v8_value_converter.cc',
       'atom/common/native_mate_converters/v8_value_converter.h',
@@ -270,6 +281,8 @@
       'atom/renderer/atom_render_view_observer.h',
       'atom/renderer/atom_renderer_client.cc',
       'atom/renderer/atom_renderer_client.h',
+      'atom/renderer/guest_view_container.cc',
+      'atom/renderer/guest_view_container.h',
       'chromium_src/chrome/browser/browser_process.cc',
       'chromium_src/chrome/browser/browser_process.h',
       'chromium_src/chrome/browser/chrome_notification_types.h',
@@ -333,6 +346,7 @@
       'chromium_src/library_loaders/libspeechd_loader.cc',
       'chromium_src/library_loaders/libspeechd.h',
       '<@(native_mate_files)',
+      '<(SHARED_INTERMEDIATE_DIR)/atom_natives.h',
     ],
     'lib_sources_win': [
       'chromium_src/chrome/browser/ui/views/color_chooser_dialog.cc',
@@ -386,7 +400,7 @@
       'target_name': '<(project_name)',
       'type': 'executable',
       'dependencies': [
-        'generated_sources',
+        'compile_coffee',
         '<(project_name)_lib',
       ],
       'sources': [
@@ -484,6 +498,8 @@
                 '<(libchromiumcontent_resources_dir)/content_resources_200_percent.pak',
                 '<(libchromiumcontent_resources_dir)/content_shell.pak',
                 '<(libchromiumcontent_resources_dir)/ui_resources_200_percent.pak',
+                '<(libchromiumcontent_resources_dir)/natives_blob.bin',
+                '<(libchromiumcontent_resources_dir)/snapshot_blob.bin',
                 'external_binaries/d3dcompiler_46.dll',
                 'external_binaries/msvcp120.dll',
                 'external_binaries/msvcr120.dll',
@@ -508,6 +524,8 @@
                 '<(libchromiumcontent_library_dir)/libffmpegsumo.so',
                 '<(libchromiumcontent_resources_dir)/icudtl.dat',
                 '<(libchromiumcontent_resources_dir)/content_shell.pak',
+                '<(libchromiumcontent_resources_dir)/natives_blob.bin',
+                '<(libchromiumcontent_resources_dir)/snapshot_blob.bin',
               ],
             },
             {
@@ -524,6 +542,7 @@
       'target_name': '<(project_name)_lib',
       'type': 'static_library',
       'dependencies': [
+        'atom_coffee2c',
         'vendor/brightray/brightray.gyp:brightray',
         'vendor/node/node.gyp:node_lib',
       ],
@@ -533,6 +552,9 @@
         'SK_SUPPORT_LEGACY_GETTOPDEVICE',
         # Disable warnings for g_settings_list_schemas.
         'GLIB_DISABLE_DEPRECATION_WARNINGS',
+        # Defined in Chromium but not exposed in its gyp file.
+        'V8_USE_EXTERNAL_STARTUP_DATA',
+        'ENABLE_PLUGINS',
       ],
       'sources': [
         '<@(lib_sources)',
@@ -542,6 +564,8 @@
         'chromium_src',
         'vendor/brightray',
         'vendor/native_mate',
+        # Include atom_natives.h.
+        '<(SHARED_INTERMEDIATE_DIR)',
         # Include directories for uv and node.
         'vendor/node/src',
         'vendor/node/deps/http_parser',
@@ -612,44 +636,56 @@
       ],
     },  # target <(product_name)_lib
     {
-      'target_name': 'generated_sources',
+      'target_name': 'compile_coffee',
       'type': 'none',
-      'sources': [
-        '<@(coffee_sources)',
-      ],
-      'rules': [
+      'actions': [
         {
-          'rule_name': 'coffee',
-          'extension': 'coffee',
+          'action_name': 'compile_coffee',
+          'variables': {
+            'conditions': [
+              ['OS=="mac"', {
+                'resources_path': '<(PRODUCT_DIR)/<(product_name).app/Contents/Resources',
+              },{
+                'resources_path': '<(PRODUCT_DIR)/resources',
+              }],
+            ],
+          },
           'inputs': [
-            'script/compile-coffee.py',
+            '<@(coffee_sources)',
           ],
-          'conditions': [
-            ['OS=="mac"', {
-              'outputs': [
-                '<(PRODUCT_DIR)/<(product_name).app/Contents/Resources/<(RULE_INPUT_DIRNAME)/<(RULE_INPUT_ROOT).js',
-              ],
-              'action': [
-                'python',
-                'script/compile-coffee.py',
-                '<(RULE_INPUT_PATH)',
-                '<(PRODUCT_DIR)/<(product_name).app/Contents/Resources/<(RULE_INPUT_DIRNAME)/<(RULE_INPUT_ROOT).js',
-              ],
-            },{  # OS=="mac"
-              'outputs': [
-                '<(PRODUCT_DIR)/resources/<(RULE_INPUT_DIRNAME)/<(RULE_INPUT_ROOT).js',
-              ],
-              'action': [
-                'python',
-                'script/compile-coffee.py',
-                '<(RULE_INPUT_PATH)',
-                '<(PRODUCT_DIR)/resources/<(RULE_INPUT_DIRNAME)/<(RULE_INPUT_ROOT).js',
-              ],
-            }],  # OS=="win" or OS=="linux"
+          'outputs': [
+            '<(resources_path)/atom.asar',
           ],
-        },
+          'action': [
+            'python',
+            'tools/coffee2asar.py',
+            '<@(_outputs)',
+            '<@(_inputs)',
+          ],
+        }
       ],
-    },  # target generated_sources
+    },  # target compile_coffee
+    {
+      'target_name': 'atom_coffee2c',
+      'type': 'none',
+      'actions': [
+        {
+          'action_name': 'atom_coffee2c',
+          'inputs': [
+            '<@(coffee2c_sources)',
+          ],
+          'outputs': [
+            '<(SHARED_INTERMEDIATE_DIR)/atom_natives.h',
+          ],
+          'action': [
+            'python',
+            'tools/coffee2c.py',
+            '<@(_outputs)',
+            '<@(_inputs)',
+          ],
+        }
+      ],
+    },  # target atom_coffee2c
     {
       'target_name': '<(project_name)_dump_symbols',
       'type': 'none',
@@ -821,6 +857,8 @@
             'atom/common/resources/mac/MainMenu.xib',
             '<(libchromiumcontent_resources_dir)/content_shell.pak',
             '<(libchromiumcontent_resources_dir)/icudtl.dat',
+            '<(libchromiumcontent_resources_dir)/natives_blob.bin',
+            '<(libchromiumcontent_resources_dir)/snapshot_blob.bin',
           ],
           'xcode_settings': {
             'INFOPLIST_FILE': 'atom/common/resources/mac/Info.plist',

@@ -120,6 +120,7 @@ class WebContents : public mate::EventEmitter,
   bool ShouldCreateWebContents(
       content::WebContents* web_contents,
       int route_id,
+      int main_frame_route_id,
       WindowContainerType window_container_type,
       const base::string16& frame_name,
       const GURL& target_url,
@@ -154,10 +155,14 @@ class WebContents : public mate::EventEmitter,
                    const GURL& validated_url,
                    int error_code,
                    const base::string16& error_description) override;
+  void DidFailProvisionalLoad(content::RenderFrameHost* render_frame_host,
+                              const GURL& validated_url,
+                              int error_code,
+                              const base::string16& error_description) override;
   void DidStartLoading(content::RenderViewHost* render_view_host) override;
   void DidStopLoading(content::RenderViewHost* render_view_host) override;
   void DidGetRedirectForResourceRequest(
-      content::RenderViewHost* render_view_host,
+      content::RenderFrameHost* render_frame_host,
       const content::ResourceRedirectDetails& details) override;
   void DidNavigateMainFrame(
       const content::LoadCommittedDetails& details,
@@ -165,16 +170,20 @@ class WebContents : public mate::EventEmitter,
   bool OnMessageReceived(const IPC::Message& message) override;
   void RenderViewReady() override;
   void WebContentsDestroyed() override;
+  void NavigationEntryCommitted(
+      const content::LoadCommittedDetails& load_details) override;
 
   // content::BrowserPluginGuestDelegate:
   void DidAttach(int guest_proxy_routing_id) final;
-  void ElementSizeChanged(const gfx::Size& old_size,
-                          const gfx::Size& new_size) final;
+  void ElementSizeChanged(const gfx::Size& size) final;
+  content::WebContents* GetOwnerWebContents() const final;
   void GuestSizeChanged(const gfx::Size& old_size,
                         const gfx::Size& new_size) final;
   void RegisterDestructionCallback(const DestructionCallback& callback) final;
+  void SetGuestSizer(content::GuestSizer* guest_sizer) final;
   void WillAttach(content::WebContents* embedder_web_contents,
-                  int browser_plugin_instance_id) final;
+                  int element_instance_id,
+                  bool is_full_page_plugin) final;
 
  private:
   // Called when received a message from renderer.
@@ -215,6 +224,9 @@ class WebContents : public mate::EventEmitter,
   // The size of the guest content. Note: In autosize mode, the container
   // element may not match the size of the guest.
   gfx::Size guest_size_;
+
+  // A pointer to the guest_sizer.
+  content::GuestSizer* guest_sizer_;
 
   // Indicates whether autosize mode is enabled or not.
   bool auto_size_enabled_;

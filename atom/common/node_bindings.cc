@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "atom/common/native_mate_converters/file_path_converter.h"
 #include "base/command_line.h"
 #include "base/base_paths.h"
 #include "base/files/file_path.h"
@@ -14,6 +15,7 @@
 #include "base/path_service.h"
 #include "content/public/browser/browser_thread.h"
 #include "native_mate/locker.h"
+#include "native_mate/dictionary.h"
 
 #if defined(OS_WIN)
 #include "base/strings/utf_string_conversions.h"
@@ -55,6 +57,7 @@ REFERENCE_MODULE(tls_wrap);
 REFERENCE_MODULE(tty_wrap);
 REFERENCE_MODULE(udp_wrap);
 REFERENCE_MODULE(uv);
+REFERENCE_MODULE(js_stream);
 // Atom Shell's builtin modules.
 REFERENCE_MODULE(atom_browser_app);
 REFERENCE_MODULE(atom_browser_auto_updater);
@@ -66,11 +69,13 @@ REFERENCE_MODULE(atom_browser_protocol);
 REFERENCE_MODULE(atom_browser_global_shortcut);
 REFERENCE_MODULE(atom_browser_tray);
 REFERENCE_MODULE(atom_browser_web_contents);
+REFERENCE_MODULE(atom_browser_web_view_manager);
 REFERENCE_MODULE(atom_browser_window);
 REFERENCE_MODULE(atom_common_asar);
 REFERENCE_MODULE(atom_common_clipboard);
 REFERENCE_MODULE(atom_common_crash_reporter);
 REFERENCE_MODULE(atom_common_id_weak_map);
+REFERENCE_MODULE(atom_common_native_image);
 REFERENCE_MODULE(atom_common_screen);
 REFERENCE_MODULE(atom_common_shell);
 REFERENCE_MODULE(atom_common_v8_util);
@@ -107,6 +112,21 @@ std::vector<std::string> String16VectorToStringVector(
   return utf8_vector;
 }
 #endif
+
+base::FilePath GetResourcesPath(base::CommandLine* command_line,
+                                bool is_browser) {
+  base::FilePath exec_path(command_line->argv()[0]);
+  PathService::Get(base::FILE_EXE, &exec_path);
+  base::FilePath resources_path =
+#if defined(OS_MACOSX)
+      is_browser ? exec_path.DirName().DirName().Append("Resources") :
+                   exec_path.DirName().DirName().DirName().DirName().DirName()
+                            .Append("Resources");
+#else
+      exec_path.DirName().Append(FILE_PATH_LITERAL("resources"));
+#endif
+  return resources_path;
+}
 
 }  // namespace
 
@@ -147,7 +167,7 @@ void NodeBindings::Initialize() {
 
 node::Environment* NodeBindings::CreateEnvironment(
     v8::Handle<v8::Context> context) {
-  CommandLine* command_line = CommandLine::ForCurrentProcess();
+  auto command_line = base::CommandLine::ForCurrentProcess();
   std::vector<std::string> args =
 #if defined(OS_WIN)
       String16VectorToStringVector(command_line->argv());
@@ -156,31 +176,26 @@ node::Environment* NodeBindings::CreateEnvironment(
 #endif
 
   // Feed node the path to initialization script.
-  base::FilePath exec_path(command_line->argv()[0]);
-  PathService::Get(base::FILE_EXE, &exec_path);
-  base::FilePath resources_path =
-#if defined(OS_MACOSX)
-      is_browser_ ? exec_path.DirName().DirName().Append("Resources") :
-                    exec_path.DirName().DirName().DirName().DirName().DirName()
-                             .Append("Resources");
-#else
-      exec_path.DirName().Append(FILE_PATH_LITERAL("resources"));
-#endif
+  base::FilePath::StringType process_type = is_browser_ ?
+      FILE_PATH_LITERAL("browser") : FILE_PATH_LITERAL("renderer");
+  base::FilePath resources_path = GetResourcesPath(command_line, is_browser_);
   base::FilePath script_path =
-      resources_path.Append(FILE_PATH_LITERAL("atom"))
-                    .Append(is_browser_ ? FILE_PATH_LITERAL("browser") :
-                                          FILE_PATH_LITERAL("renderer"))
+      resources_path.Append(FILE_PATH_LITERAL("atom.asar"))
+                    .Append(process_type)
                     .Append(FILE_PATH_LITERAL("lib"))
                     .Append(FILE_PATH_LITERAL("init.js"));
   std::string script_path_str = script_path.AsUTF8Unsafe();
   args.insert(args.begin() + 1, script_path_str.c_str());
 
   scoped_ptr<const char*[]> c_argv = StringVectorToArgArray(args);
-  return node::CreateEnvironment(context->GetIsolate(),
-                                 uv_default_loop(),
-                                 context,
-                                 args.size(), c_argv.get(),
-                                 0, nullptr);
+  node::Environment* env =  node::CreateEnvironment(
+      context->GetIsolate(), uv_default_loop(), context,
+      args.size(), c_argv.get(), 0, nullptr);
+
+  mate::Dictionary process(context->GetIsolate(), env->process_object());
+  process.Set("type", process_type);
+  process.Set("resourcesPath", resources_path);
+  return env;
 }
 
 void NodeBindings::LoadEnvironment(node::Environment* env) {

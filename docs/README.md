@@ -1,13 +1,16 @@
-## Tutorials
+## Guides
 
-* [Quick start](tutorial/quick-start.md)
 * [Application distribution](tutorial/application-distribution.md)
 * [Application packaging](tutorial/application-packaging.md)
 * [Using native node modules](tutorial/using-native-node-modules.md)
-* [Desktop environment integration](tutorial/desktop-environment-integration.md)
 * [Debugging browser process](tutorial/debugging-browser-process.md)
 * [Using Selenium and WebDriver](tutorial/using-selenium-and-webdriver.md)
 * [DevTools extension](tutorial/devtools-extension.md)
+
+## Tutorials
+
+* [Quick start](tutorial/quick-start.md)
+* [Desktop environment integration](tutorial/desktop-environment-integration.md)
 * [Online/offline event detection](tutorial/online-offline-events.md)
 
 ## API references
@@ -20,6 +23,7 @@ Custom DOM elements:
 
 * [`File` object](api/file-object.md)
 * [`<webview>` tag](api/web-view-tag.md)
+* [`window.open` function](api/window-open.md)
 
 Modules for browser side:
 
@@ -46,6 +50,7 @@ Modules for both sides:
 
 * [clipboard](api/clipboard.md)
 * [crash-reporter](api/crash-reporter.md)
+* [native-image](api/native-image.md)
 * [screen](api/screen.md)
 * [shell](api/shell.md)
 
@@ -53,7 +58,7 @@ Modules for both sides:
 
 * [Coding style](development/coding-style.md)
 * [Source code directory structure](development/source-code-directory-structure.md)
-* [Technical differences to node-webkit](development/atom-shell-vs-node-webkit.md)
+* [Technical differences to NW.js (formerly node-webkit)](development/atom-shell-vs-node-webkit.md)
 * [Build instructions (Mac)](development/build-instructions-mac.md)
 * [Build instructions (Windows)](development/build-instructions-windows.md)
 * [Build instructions (Linux)](development/build-instructions-linux.md)

@@ -58,6 +58,11 @@ describe 'browser-window module', ->
         done()
       w.loadUrl 'about:blank'
 
+    it 'should emit did-fail-load event', (done) ->
+      w.webContents.on 'did-fail-load', ->
+        done()
+      w.loadUrl 'file://a.txt'
+
   describe 'BrowserWindow.show()', ->
     it 'should focus on window', ->
       return if isCI
@@ -78,7 +83,7 @@ describe 'browser-window module', ->
   describe 'BrowserWindow.capturePage(rect, callback)', ->
     it 'calls the callback with a Buffer', (done) ->
       w.capturePage {x: 0, y: 0, width: 100, height: 100}, (image) ->
-        assert.equal image.constructor.name, 'Buffer'
+        assert.equal image.isEmpty(), true
         done()
 
   describe 'BrowserWindow.setSize(width, height)', ->

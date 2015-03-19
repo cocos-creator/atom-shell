@@ -7,7 +7,7 @@ source code.
 ## Generating `asar` archive
 
 An [asar][asar] archive is a simple tar-like format that concatenates files
-into a single file, atom-shell can read arbitrary file in it without unpacking
+into a single file, atom-shell can read arbitrary files from it without unpacking
 the whole file.
 
 Following is the steps to package your app into an `asar` archive:
@@ -67,6 +67,14 @@ Use a module from the archive:
 require('/path/to/example.asar/dir/module.js');
 ```
 
+You can also display a web page in an `asar` archive with `BrowserWindow`:
+
+```javascript
+var BrowserWindow = require('browser-window');
+var win = new BrowserWindow({width: 800, height: 600});
+win.loadUrl('file:///path/to/example.asar/static/index.html');
+```
+
 ### Web API
 
 In a web page, files in archive can be requested with the `file:` protocol. Like
@@ -81,14 +89,6 @@ $.get('file:///path/to/example.asar/file.txt', function(data) {
   console.log(data);
 });
 </script>
-```
-
-You can also display a web page in an `asar` archive with `BrowserWindow`:
-
-```javascript
-var BrowserWindow = require('browser-window');
-var win = new BrowserWindow({width: 800, height: 600});
-win.loadUrl('file:///path/to/example.asar/static/index.html');
 ```
 
 ### Treating `asar` archive as normal file

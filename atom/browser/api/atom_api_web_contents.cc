@@ -7,7 +7,7 @@
 #include "atom/browser/atom_browser_context.h"
 #include "atom/browser/native_window.h"
 #include "atom/browser/web_dialog_helper.h"
-#include "atom/browser/web_view/web_view_renderer_state.h"
+#include "atom/browser/web_view_manager.h"
 #include "atom/common/api/api_messages.h"
 #include "atom/common/native_mate_converters/gfx_converter.h"
 #include "atom/common/native_mate_converters/gurl_converter.h"
@@ -16,6 +16,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "brightray/browser/inspectable_web_contents.h"
 #include "content/public/browser/navigation_details.h"
+#include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_view_host.h"
@@ -39,13 +40,13 @@ v8::Persistent<v8::ObjectTemplate> template_;
 
 // Get the window that has the |guest| embedded.
 NativeWindow* GetWindowFromGuest(const content::WebContents* guest) {
-  int guest_process_id = guest->GetRenderProcessHost()->GetID();
-  WebViewRendererState::WebViewInfo info;
-  if (!WebViewRendererState::GetInstance()->GetInfo(guest_process_id, &info))
+  WebViewManager::WebViewInfo info;
+  if (WebViewManager::GetInfoForProcess(guest->GetRenderProcessHost(), &info))
+    return NativeWindow::FromRenderView(
+        info.embedder->GetRenderProcessHost()->GetID(),
+        info.embedder->GetRoutingID());
+  else
     return nullptr;
-  return NativeWindow::FromRenderView(
-      info.embedder->GetRenderProcessHost()->GetID(),
-      info.embedder->GetRoutingID());
 }
 
 }  // namespace
@@ -55,6 +56,7 @@ WebContents::WebContents(content::WebContents* web_contents)
       guest_instance_id_(-1),
       element_instance_id_(-1),
       guest_opaque_(true),
+      guest_sizer_(nullptr),
       auto_size_enabled_(false) {
 }
 
@@ -62,6 +64,7 @@ WebContents::WebContents(const mate::Dictionary& options)
     : guest_instance_id_(-1),
       element_instance_id_(-1),
       guest_opaque_(true),
+      guest_sizer_(nullptr),
       auto_size_enabled_(false) {
   options.Get("guestInstanceId", &guest_instance_id_);
 
@@ -95,6 +98,7 @@ bool WebContents::AddMessageToConsole(content::WebContents* source,
 bool WebContents::ShouldCreateWebContents(
     content::WebContents* web_contents,
     int route_id,
+    int main_frame_route_id,
     WindowContainerType window_container_type,
     const base::string16& frame_name,
     const GURL& target_url,
@@ -196,6 +200,15 @@ void WebContents::DidFinishLoad(content::RenderFrameHost* render_frame_host,
     Emit("did-finish-load");
 }
 
+// this error occurs when host could not be found
+void WebContents::DidFailProvisionalLoad(
+    content::RenderFrameHost* render_frame_host,
+    const GURL& validated_url,
+    int error_code,
+    const base::string16& error_description) {
+  Emit("did-fail-load", error_code, error_description);
+}
+
 void WebContents::DidFailLoad(content::RenderFrameHost* render_frame_host,
                               const GURL& validated_url,
                               int error_code,
@@ -212,7 +225,7 @@ void WebContents::DidStopLoading(content::RenderViewHost* render_view_host) {
 }
 
 void WebContents::DidGetRedirectForResourceRequest(
-    content::RenderViewHost* render_view_host,
+    content::RenderFrameHost* render_frame_host,
     const content::ResourceRedirectDetails& details) {
   Emit("did-get-redirect-request",
        details.url,
@@ -264,13 +277,26 @@ void WebContents::WebContentsDestroyed() {
   Emit("destroyed");
 }
 
+void WebContents::NavigationEntryCommitted(
+    const content::LoadCommittedDetails& load_details) {
+  auto entry = web_contents()->GetController().GetLastCommittedEntry();
+  entry->SetVirtualURL(load_details.entry->GetOriginalRequestURL());
+}
+
 void WebContents::DidAttach(int guest_proxy_routing_id) {
   Emit("did-attach");
 }
 
-void WebContents::ElementSizeChanged(const gfx::Size& old_size,
-                                     const gfx::Size& new_size) {
-  element_size_ = new_size;
+void WebContents::ElementSizeChanged(const gfx::Size& size) {
+  element_size_ = size;
+
+  // Only resize if needed.
+  if (!size.IsEmpty())
+    guest_sizer_->SizeContents(size);
+}
+
+content::WebContents* WebContents::GetOwnerWebContents() const {
+  return embedder_web_contents_;
 }
 
 void WebContents::GuestSizeChanged(const gfx::Size& old_size,
@@ -286,10 +312,15 @@ void WebContents::RegisterDestructionCallback(
   destruction_callback_ = callback;
 }
 
+void WebContents::SetGuestSizer(content::GuestSizer* guest_sizer) {
+  guest_sizer_ = guest_sizer;
+}
+
 void WebContents::WillAttach(content::WebContents* embedder_web_contents,
-                             int browser_plugin_instance_id) {
+                             int element_instance_id,
+                             bool is_full_page_plugin) {
   embedder_web_contents_ = embedder_web_contents;
-  element_instance_id_ = browser_plugin_instance_id;
+  element_instance_id_ = element_instance_id;
 }
 
 void WebContents::Destroy() {
@@ -323,7 +354,8 @@ void WebContents::LoadURL(const GURL& url, const mate::Dictionary& options) {
 }
 
 GURL WebContents::GetURL() const {
-  return web_contents()->GetURL();
+  auto entry = web_contents()->GetController().GetLastCommittedEntry();
+  return entry->GetVirtualURL();
 }
 
 base::string16 WebContents::GetTitle() const {

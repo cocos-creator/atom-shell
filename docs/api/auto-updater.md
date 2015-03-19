@@ -2,6 +2,9 @@
 
 **This module has only been implemented for OS X.**
 
+Check out [atom/grunt-atom-shell-installer](https://github.com/atom/grunt-atom-shell-installer)
+for building a Windows installer for your app.
+
 The `auto-updater` module is a simple wrap around the
 [Squirrel.Mac](https://github.com/Squirrel/Squirrel.Mac) framework.
 

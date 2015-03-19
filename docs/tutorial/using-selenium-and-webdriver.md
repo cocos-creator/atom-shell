@@ -1,6 +1,6 @@
 # Using Selenium and WebDriver
 
-From [chromedriver - WebDriver for Google Chrome][chrome-driver]:
+From [ChromeDriver - WebDriver for Chrome][chrome-driver]:
 
 > WebDriver is an open source tool for automated testing of web apps across many
 > browsers. It provides capabilities for navigating to web pages, user input,
@@ -55,6 +55,7 @@ var driver = new webdriver.Builder().
    withCapabilities({chromeOptions: {
      // Here is the path to your atom-shell binary.
      binary: '/Path-to-Your-App.app/Contents/MacOS/Atom'}}).
+   forBrowser('atom-shell').
    build();
 
 driver.get('http://www.google.com');
@@ -69,4 +70,4 @@ driver.wait(function() {
 driver.quit();
 ```
 
-[chrome-driver]: https://code.google.com/p/chromedriver/
+[chrome-driver]: https://sites.google.com/a/chromium.org/chromedriver/

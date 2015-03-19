@@ -43,13 +43,13 @@ You can also create a window without chrome by using
      other windows
   * `fullscreen` Boolean - Whether the window should show in fullscreen, when
     set to `false` the fullscreen button would also be hidden on OS X
-  * `skip-taskbar` Boolean - Do not show window in taskbar
+  * `skip-taskbar` Boolean - Do not show window in Taskbar
   * `zoom-factor` Number - The default zoom factor of the page, zoom factor is
     zoom percent / 100, so `3.0` represents `300%`
   * `kiosk` Boolean - The kiosk mode
   * `title` String - Default window title
-  * `icon` [Image](image.md) - The window icon, when omitted on Windows the
-    executable's icon would be used as window icon
+  * `icon` [NativeImage](native-image.md) - The window icon, when omitted on
+    Windows the executable's icon would be used as window icon
   * `show` Boolean - Whether window should be shown when created
   * `frame` Boolean - Specify `false` to create a
     [Frameless Window](frameless-window.md)
@@ -68,6 +68,9 @@ You can also create a window without chrome by using
     no matter whether node integration is turned on for the window, and the path
     of `preload` script has to be absolute path.
   * `transparent` Boolean - Makes the window [transparent](frameless-window.md)
+  * `type` String - Specifies the type of the window, possible types are
+    `desktop`, `dock`, `toolbar`, `splash`, `notification`. This only works on
+    Linux.
   * `web-preferences` Object - Settings of web page's features
     * `javascript` Boolean
     * `web-security` Boolean
@@ -85,7 +88,6 @@ You can also create a window without chrome by using
       under current working directory.
     * `experimental-features` Boolean
     * `experimental-canvas-features` Boolean
-    * `subpixel-font-scaling` Boolean
     * `overlay-scrollbars` Boolean
     * `overlay-fullscreen-video` Boolean
     * `shared-worker` Boolean
@@ -412,7 +414,7 @@ Starts or stops flashing the window to attract user's attention.
 
 * `skip` Boolean
 
-Makes the window do not show in taskbar.
+Makes the window do not show in Taskbar.
 
 ### BrowserWindow.setKiosk(flag)
 
@@ -540,6 +542,18 @@ On Linux platform, only supports Unity desktop environment, you need to specify
 the `*.desktop` file name to `desktopName` field in `package.json`. By default,
 it will assume `app.getName().desktop`.
 
+### BrowserWindow.setOverlayIcon(overlay, description)
+
+* `overlay` [NativeImage](native-image.md) - the icon to display on the bottom
+right corner of the Taskbar icon. If this parameter is `null`, the overlay is
+cleared
+* `description` String - a description that will be provided to Accessibility
+screen readers
+
+Sets a 16px overlay onto the current Taskbar icon, usually used to convey some sort of application status or to passively notify the user.
+
+__Note:__ This API is only available on Windows, Win7 or above
+
 ### BrowserWindow.showDefinitionForSelection()
 
 Shows pop-up dictionary that searches the selected word on the page.
@@ -627,12 +641,11 @@ Emitted when a redirect was received while requesting a resource.
 Emitted when the page requested to open a new window for `url`. It could be
 requested by `window.open` or an external link like `<a target='_blank'>`.
 
-By default a new `BrowserWindow` will be created for the `url`, and a proxy
-will be returned to `window.open` to let you have limited control of it.
+By default a new `BrowserWindow` will be created for the `url`.
 
 Calling `event.preventDefault()` can prevent creating new windows.
 
-### Event: 'will-naviagte'
+### Event: 'will-navigate'
 
 * `event` Event
 * `url` String

@@ -1,6 +1,6 @@
 {
   "name": "atom-shell",
-  "version": "0.21.1",
+  "version": "0.22.1",
 
   "licenses": [
     {
@@ -10,7 +10,8 @@
   ],
 
   "devDependencies": {
-    "atom-package-manager": "0.126.0",
+    "atom-package-manager": "0.144.0",
+    "asar": "0.2.2",
     "coffee-script": "~1.7.1",
     "coffeelint": "~1.3.0",
     "request": "*"

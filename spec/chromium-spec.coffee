@@ -1,5 +1,6 @@
 assert = require 'assert'
 http = require 'http'
+https = require 'https'
 path = require 'path'
 
 describe 'chromium feature', ->
@@ -32,9 +33,9 @@ describe 'chromium feature', ->
       assert.notEqual navigator.language, ''
 
   describe 'window.open', ->
-    it 'returns a FakeWindow object', ->
+    it 'returns a BrowserWindowProxy object', ->
       b = window.open 'about:blank', 'test', 'show=no'
-      assert.equal b.constructor.name, 'FakeWindow'
+      assert.equal b.constructor.name, 'BrowserWindowProxy'
       b.close()
 
   describe 'creating a Uint8Array under browser side', ->

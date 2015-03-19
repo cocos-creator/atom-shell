@@ -347,6 +347,14 @@ describe 'asar package', ->
         throws = -> child_process.fork p
         assert.throws throws, /ENOENT/
 
+      it 'supports asar in the forked js', (done) ->
+        file = path.join fixtures, 'asar', 'a.asar', 'file1'
+        child = child_process.fork path.join(fixtures, 'module', 'asar.js')
+        child.on 'message', (content) ->
+          assert.equal content, fs.readFileSync(file).toString()
+          done()
+        child.send file
+
   describe 'asar protocol', ->
     url = require 'url'
     remote = require 'remote'
@@ -422,3 +430,9 @@ describe 'asar package', ->
 
     it 'does not touch global fs object', ->
       assert.notEqual fs.readdir, gfs.readdir
+
+  describe 'native-image', ->
+    it 'reads image from asar archive', ->
+      p = path.join fixtures, 'asar', 'logo.asar', 'logo.png'
+      logo = require('native-image').createFromPath p
+      assert.deepEqual logo.getSize(), {width: 55, height: 55}

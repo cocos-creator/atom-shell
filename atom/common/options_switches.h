@@ -40,10 +40,10 @@ extern const char kEnablePlugins[];
 extern const char kGuestInstanceID[];
 extern const char kPreloadScript[];
 extern const char kTransparent[];
+extern const char kType[];
 
 extern const char kExperimentalFeatures[];
 extern const char kExperimentalCanvasFeatures[];
-extern const char kSubpixelFontScaling[];
 extern const char kOverlayScrollbars[];
 extern const char kOverlayFullscreenVideo[];
 extern const char kSharedWorker[];
