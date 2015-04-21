@@ -224,6 +224,17 @@ void WebContents::DidStopLoading(content::RenderViewHost* render_view_host) {
   Emit("did-stop-loading");
 }
 
+void WebContents::DidGetResourceResponseStart(
+    const content::ResourceRequestDetails& details) {
+  Emit("did-get-response-details",
+       details.socket_address.IsEmpty(),
+       details.url,
+       details.original_url,
+       details.http_response_code,
+       details.method,
+       details.referrer);
+}
+
 void WebContents::DidGetRedirectForResourceRequest(
     content::RenderFrameHost* render_frame_host,
     const content::ResourceRedirectDetails& details) {
@@ -238,6 +249,11 @@ void WebContents::DidNavigateMainFrame(
     const content::FrameNavigateParams& params) {
   if (details.is_navigation_to_different_page())
     Emit("did-navigate-to-different-page");
+}
+
+void WebContents::TitleWasSet(content::NavigationEntry* entry,
+                              bool explicit_set) {
+  Emit("page-title-set", entry->GetTitle(), explicit_set);
 }
 
 bool WebContents::OnMessageReceived(const IPC::Message& message) {
@@ -355,6 +371,8 @@ void WebContents::LoadURL(const GURL& url, const mate::Dictionary& options) {
 
 GURL WebContents::GetURL() const {
   auto entry = web_contents()->GetController().GetLastCommittedEntry();
+  if (!entry)
+    return GURL::EmptyGURL();
   return entry->GetVirtualURL();
 }
 
@@ -382,6 +400,9 @@ void WebContents::Reload(const mate::Dictionary& options) {
 }
 
 void WebContents::ReloadIgnoringCache(const mate::Dictionary& options) {
+  // Hack to remove pending entries that ignores cache and treated as a fresh
+  // load.
+  web_contents()->GetController().ReloadIgnoringCache(false);
   Reload(options);
 }
 

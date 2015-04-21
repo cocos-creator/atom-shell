@@ -14,6 +14,8 @@
 #include "base/memory/scoped_ptr.h"
 #include "atom/browser/native_window.h"
 
+@class AtomNSWindow;
+@class AtomNSWindowDelegate;
 @class FullSizeContentView;
 class SkRegion;
 
@@ -75,6 +77,9 @@ class NativeWindowMac : public NativeWindow {
                       const std::string& description) override;
   void ShowDefinitionForSelection() override;
 
+  void SetVisibleOnAllWorkspaces(bool visible) override;
+  bool IsVisibleOnAllWorkspaces() override;
+
   // Returns true if |point| in local Cocoa coordinate system falls within
   // the draggable region.
   bool IsWithinDraggableRegion(NSPoint point) const;
@@ -102,7 +107,8 @@ class NativeWindowMac : public NativeWindow {
   // whehter we can drag.
   void InstallDraggableRegionView();
 
-  base::scoped_nsobject<NSWindow> window_;
+  base::scoped_nsobject<AtomNSWindow> window_;
+  base::scoped_nsobject<AtomNSWindowDelegate> window_delegate_;
 
   // The view that will fill the whole frameless window.
   base::scoped_nsobject<FullSizeContentView> content_view_;

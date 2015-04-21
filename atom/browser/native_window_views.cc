@@ -307,7 +307,7 @@ bool NativeWindowViews::IsFocused() {
 }
 
 void NativeWindowViews::Show() {
-  window_->Show();
+  window_->native_widget_private()->ShowWithWindowState(GetRestoredState());
 }
 
 void NativeWindowViews::ShowInactive() {
@@ -674,6 +674,23 @@ bool NativeWindowViews::IsMenuBarVisible() {
   return menu_bar_visible_;
 }
 
+void NativeWindowViews::SetVisibleOnAllWorkspaces(bool visible) {
+  window_->SetVisibleOnAllWorkspaces(visible);
+}
+
+bool NativeWindowViews::IsVisibleOnAllWorkspaces() {
+#if defined(USE_X11)
+  // Use the presence/absence of _NET_WM_STATE_STICKY in _NET_WM_STATE to
+  // determine whether the current window is visible on all workspaces.
+  XAtom sticky_atom = GetAtom("_NET_WM_STATE_STICKY");
+  std::vector<XAtom> wm_states;
+  ui::GetAtomArrayProperty(GetAcceleratedWidget(), "_NET_WM_STATE", &wm_states);
+  return std::find(wm_states.begin(),
+                   wm_states.end(), sticky_atom) != wm_states.end();
+#endif
+  return false;
+}
+
 gfx::AcceleratedWidget NativeWindowViews::GetAcceleratedWidget() {
   return GetNativeWindow()->GetHost()->GetAcceleratedWidget();
 }
@@ -925,6 +942,15 @@ gfx::Rect NativeWindowViews::ContentBoundsToWindowBounds(
   if (menu_bar_ && menu_bar_visible_)
     window_bounds.set_height(window_bounds.height() + kMenuBarHeight);
   return window_bounds;
+}
+
+ui::WindowShowState NativeWindowViews::GetRestoredState() {
+  if (IsMaximized())
+    return ui::SHOW_STATE_MAXIMIZED;
+  if (IsFullscreen())
+    return ui::SHOW_STATE_FULLSCREEN;
+
+  return ui::SHOW_STATE_NORMAL;
 }
 
 // static

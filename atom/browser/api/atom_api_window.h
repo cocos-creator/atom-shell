@@ -64,6 +64,7 @@ class Window : public mate::EventEmitter,
   void OnWindowLeaveFullScreen() override;
   void OnRendererUnresponsive() override;
   void OnRendererResponsive() override;
+  void OnDevToolsFocus() override;
 
  private:
   // APIs for NativeWindow.
@@ -105,7 +106,7 @@ class Window : public mate::EventEmitter,
   void SetSkipTaskbar(bool skip);
   void SetKiosk(bool kiosk);
   bool IsKiosk();
-  void OpenDevTools();
+  void OpenDevTools(bool can_dock);
   void CloseDevTools();
   bool IsDevToolsOpened();
   void InspectElement(int x, int y);
@@ -129,6 +130,9 @@ class Window : public mate::EventEmitter,
 #if defined(OS_MACOSX)
   void ShowDefinitionForSelection();
 #endif
+
+  void SetVisibleOnAllWorkspaces(bool visible);
+  bool IsVisibleOnAllWorkspaces();
 
   // APIs for WebContents.
   mate::Handle<WebContents> GetWebContents(v8::Isolate* isolate) const;

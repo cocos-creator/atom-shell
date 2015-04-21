@@ -9,7 +9,10 @@
 On Ubuntu you could install the libraries via:
 
 ```bash
-$ sudo apt-get install build-essential clang libdbus-1-dev libgtk2.0-dev libnotify-dev libgnome-keyring-dev libgconf2-dev gcc-multilib g++-multilib
+$ sudo apt-get install build-essential clang libdbus-1-dev libgtk2.0-dev \
+                       libnotify-dev libgnome-keyring-dev libgconf2-dev \
+                       libasound2-dev libcap-dev libcups2-dev libxtst-dev \
+                       gcc-multilib g++-multilib
 ```
 
 Latest Node.js could be installed via ppa:
@@ -27,17 +30,17 @@ $ sudo npm install npm -g
 ## Getting the code
 
 ```bash
-$ git clone https://github.com/atom/atom-shell.git
+$ git clone https://github.com/atom/electron.git
 ```
 
 ## Bootstrapping
 
 The bootstrap script will download all necessary build dependencies and create
-build project files. Notice that we're using `ninja` to build `atom-shell` so
+build project files. Notice that we're using `ninja` to build Electron so
 there is no `Makefile` generated.
 
 ```bash
-$ cd atom-shell
+$ cd electron
 $ ./script/bootstrap.py -v
 ```
 
@@ -52,10 +55,10 @@ $ ./script/build.py
 You can also only build the `Debug` target:
 
 ```bash
-$ ./script/build.py -c Debug
+$ ./script/build.py -c D
 ```
 
-After building is done, you can find `atom` under `out/Debug`.
+After building is done, you can find `atom` under `out/D`.
 
 ## Troubleshooting
 
@@ -95,7 +98,7 @@ versions of clang. Try using clang 3.0, default version in Ubuntu 12.04.
 If you get an error like:
 
 ````
-/usr/bin/ld: warning: libudev.so.0, needed by /home/suyash/projects/atom-shell/vendor/brightray/vendor/download/libchromiumcontent/Release/libchromiumcontent.so, not found (try using -rpath or -rpath-link)
+/usr/bin/ld: warning: libudev.so.0, needed by .../vendor/brightray/vendor/download/libchromiumcontent/Release/libchromiumcontent.so, not found (try using -rpath or -rpath-link)
 ````
 
 and you are on Ubuntu 13.04+, 64 bit system, try doing

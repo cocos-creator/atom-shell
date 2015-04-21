@@ -15,6 +15,12 @@ describe 'asar package', ->
         file3 = path.join fixtures, 'asar', 'a.asar', 'file3'
         assert.equal fs.readFileSync(file3).toString(), 'file3\n'
 
+      it 'reads from a empty file', ->
+        file = path.join fixtures, 'asar', 'empty.asar', 'file1'
+        buffer = fs.readFileSync(file)
+        assert.equal buffer.length, 0
+        assert.equal buffer.toString(), ''
+
       it 'reads a linked file', ->
         p = path.join fixtures, 'asar', 'a.asar', 'link1'
         assert.equal fs.readFileSync(p).toString(), 'file1\n'
@@ -36,6 +42,13 @@ describe 'asar package', ->
         fs.readFile p, (err, content) ->
           assert.equal err, null
           assert.equal String(content), 'file1\n'
+          done()
+
+      it 'reads from a empty file', (done) ->
+        p = path.join fixtures, 'asar', 'empty.asar', 'file1'
+        fs.readFile p, (err, content) ->
+          assert.equal err, null
+          assert.equal String(content), ''
           done()
 
       it 'reads a linked file', (done) ->
@@ -342,11 +355,6 @@ describe 'asar package', ->
           done()
         child.send 'message'
 
-      it 'throws ENOENT error when can not find file', ->
-        p = path.join fixtures, 'asar', 'a.asar', 'not-exist'
-        throws = -> child_process.fork p
-        assert.throws throws, /ENOENT/
-
       it 'supports asar in the forked js', (done) ->
         file = path.join fixtures, 'asar', 'a.asar', 'file1'
         child = child_process.fork path.join(fixtures, 'module', 'asar.js')
@@ -365,6 +373,12 @@ describe 'asar package', ->
       p = path.resolve fixtures, 'asar', 'a.asar', 'file1'
       $.get "file://#{p}", (data) ->
         assert.equal data, 'file1\n'
+        done()
+
+    it 'can request a file in package with unpacked files', (done) ->
+      p = path.resolve fixtures, 'asar', 'unpack.asar', 'a.txt'
+      $.get "file://#{p}", (data) ->
+        assert.equal data, 'a\n'
         done()
 
     it 'can request a linked file in package', (done) ->
@@ -436,3 +450,8 @@ describe 'asar package', ->
       p = path.join fixtures, 'asar', 'logo.asar', 'logo.png'
       logo = require('native-image').createFromPath p
       assert.deepEqual logo.getSize(), {width: 55, height: 55}
+
+    it 'reads image from asar archive with unpacked files', ->
+      p = path.join fixtures, 'asar', 'unpack.asar', 'atom.png'
+      logo = require('native-image').createFromPath p
+      assert.deepEqual logo.getSize(), {width: 1024, height: 1024}

@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "atom/app/atom_main_args.h"
 #include "atom/common/native_mate_converters/file_path_converter.h"
 #include "base/command_line.h"
 #include "base/base_paths.h"
@@ -14,51 +15,20 @@
 #include "base/message_loop/message_loop.h"
 #include "base/path_service.h"
 #include "content/public/browser/browser_thread.h"
+#include "content/public/common/content_paths.h"
 #include "native_mate/locker.h"
 #include "native_mate/dictionary.h"
-
-#if defined(OS_WIN)
-#include "base/strings/utf_string_conversions.h"
-#endif
 
 #include "atom/common/node_includes.h"
 
 using content::BrowserThread;
-
-// Forward declaration of internal node functions.
-namespace node {
-void Init(int*, const char**, int*, const char***);
-}
 
 // Force all builtin modules to be referenced so they can actually run their
 // DSO constructors, see http://git.io/DRIqCg.
 #define REFERENCE_MODULE(name) \
   extern "C" void _register_ ## name(void); \
   void (*fp_register_ ## name)(void) = _register_ ## name
-// Node's builtin modules.
-REFERENCE_MODULE(cares_wrap);
-REFERENCE_MODULE(fs_event_wrap);
-REFERENCE_MODULE(buffer);
-REFERENCE_MODULE(contextify);
-REFERENCE_MODULE(crypto);
-REFERENCE_MODULE(fs);
-REFERENCE_MODULE(http_parser);
-REFERENCE_MODULE(os);
-REFERENCE_MODULE(v8);
-REFERENCE_MODULE(zlib);
-REFERENCE_MODULE(pipe_wrap);
-REFERENCE_MODULE(process_wrap);
-REFERENCE_MODULE(signal_wrap);
-REFERENCE_MODULE(smalloc);
-REFERENCE_MODULE(spawn_sync);
-REFERENCE_MODULE(tcp_wrap);
-REFERENCE_MODULE(timer_wrap);
-REFERENCE_MODULE(tls_wrap);
-REFERENCE_MODULE(tty_wrap);
-REFERENCE_MODULE(udp_wrap);
-REFERENCE_MODULE(uv);
-REFERENCE_MODULE(js_stream);
-// Atom Shell's builtin modules.
+// Electron's builtin modules.
 REFERENCE_MODULE(atom_browser_app);
 REFERENCE_MODULE(atom_browser_auto_updater);
 REFERENCE_MODULE(atom_browser_content_tracing);
@@ -83,6 +53,14 @@ REFERENCE_MODULE(atom_renderer_ipc);
 REFERENCE_MODULE(atom_renderer_web_frame);
 #undef REFERENCE_MODULE
 
+// The "v8::Function::kLineOffsetNotFound" is exported in node.dll, but the
+// linker can not find it, could be a bug of VS.
+#if defined(OS_WIN) && !defined(DEBUG)
+namespace v8 {
+const int Function::kLineOffsetNotFound = -1;
+}
+#endif
+
 namespace atom {
 
 namespace {
@@ -97,26 +75,17 @@ void UvNoOp(uv_async_t* handle) {
 scoped_ptr<const char*[]> StringVectorToArgArray(
     const std::vector<std::string>& vector) {
   scoped_ptr<const char*[]> array(new const char*[vector.size()]);
-  for (size_t i = 0; i < vector.size(); ++i)
+  for (size_t i = 0; i < vector.size(); ++i) {
     array[i] = vector[i].c_str();
+  }
   return array.Pass();
 }
 
-#if defined(OS_WIN)
-std::vector<std::string> String16VectorToStringVector(
-    const std::vector<base::string16>& vector) {
-  std::vector<std::string> utf8_vector;
-  utf8_vector.reserve(vector.size());
-  for (size_t i = 0; i < vector.size(); ++i)
-    utf8_vector.push_back(base::UTF16ToUTF8(vector[i]));
-  return utf8_vector;
-}
-#endif
-
-base::FilePath GetResourcesPath(base::CommandLine* command_line,
-                                bool is_browser) {
-  base::FilePath exec_path(command_line->argv()[0]);
+base::FilePath GetResourcesPath(bool is_browser) {
+  auto command_line = base::CommandLine::ForCurrentProcess();
+  base::FilePath exec_path(command_line->GetProgram());
   PathService::Get(base::FILE_EXE, &exec_path);
+
   base::FilePath resources_path =
 #if defined(OS_MACOSX)
       is_browser ? exec_path.DirName().DirName().Append("Resources") :
@@ -159,26 +128,24 @@ void NodeBindings::Initialize() {
   node::g_standalone_mode = is_browser_;
   node::g_upstream_node_mode = false;
 
+  // Parse the debug args.
+  auto args = AtomCommandLine::argv();
+  for (const std::string& arg : args)
+    node::ParseDebugOpt(arg.c_str());
+
   // Init node.
-  // (we assume it would not node::Init would not modify the parameters under
-  // embedded mode).
+  // (we assume node::Init would not modify the parameters under embedded mode).
   node::Init(nullptr, nullptr, nullptr, nullptr);
 }
 
 node::Environment* NodeBindings::CreateEnvironment(
     v8::Handle<v8::Context> context) {
-  auto command_line = base::CommandLine::ForCurrentProcess();
-  std::vector<std::string> args =
-#if defined(OS_WIN)
-      String16VectorToStringVector(command_line->argv());
-#else
-      command_line->argv();
-#endif
+  auto args = AtomCommandLine::argv();
 
   // Feed node the path to initialization script.
   base::FilePath::StringType process_type = is_browser_ ?
       FILE_PATH_LITERAL("browser") : FILE_PATH_LITERAL("renderer");
-  base::FilePath resources_path = GetResourcesPath(command_line, is_browser_);
+  base::FilePath resources_path = GetResourcesPath(is_browser_);
   base::FilePath script_path =
       resources_path.Append(FILE_PATH_LITERAL("atom.asar"))
                     .Append(process_type)
@@ -188,18 +155,29 @@ node::Environment* NodeBindings::CreateEnvironment(
   args.insert(args.begin() + 1, script_path_str.c_str());
 
   scoped_ptr<const char*[]> c_argv = StringVectorToArgArray(args);
-  node::Environment* env =  node::CreateEnvironment(
+  node::Environment* env = node::CreateEnvironment(
       context->GetIsolate(), uv_default_loop(), context,
       args.size(), c_argv.get(), 0, nullptr);
 
   mate::Dictionary process(context->GetIsolate(), env->process_object());
   process.Set("type", process_type);
   process.Set("resourcesPath", resources_path);
+  // The path to helper app.
+  base::FilePath helper_exec_path;
+  PathService::Get(content::CHILD_PROCESS_EXE, &helper_exec_path);
+  process.Set("helperExecPath", helper_exec_path);
   return env;
 }
 
 void NodeBindings::LoadEnvironment(node::Environment* env) {
+  node::node_isolate = env->isolate();
+  if (node::use_debug_agent)
+    node::StartDebug(env, node::debug_wait_connect);
+
   node::LoadEnvironment(env);
+
+  if (node::use_debug_agent)
+    node::EnableDebug(env);
 }
 
 void NodeBindings::PrepareMessageLoop() {

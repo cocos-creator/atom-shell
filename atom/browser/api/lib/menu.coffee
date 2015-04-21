@@ -23,6 +23,37 @@ generateGroupId = (items, pos) ->
       break if item.type is 'separator'
   ++nextGroupId
 
+# Returns the index of item according to |id|.
+indexOfItemById = (items, id) ->
+  return i for item, i in items when item.id is id
+  -1
+
+# Returns the index of where to insert the item according to |position|.
+indexToInsertByPosition = (items, position) ->
+  return items.length unless position
+
+  [query, id] = position.split '='
+  insertIndex = indexOfItemById items, id
+  if insertIndex is -1 and query isnt 'endof'
+    console.warn "Item with id '#{id}' is not found"
+    return items.length
+
+  switch query
+    when 'after'
+      insertIndex++
+    when 'endof'
+      # If the |id| doesn't exist, then create a new group with the |id|.
+      if insertIndex is -1
+        items.push id: id, type: 'separator'
+        insertIndex = items.length - 1
+
+      # Find the end of the group.
+      insertIndex++
+      while insertIndex < items.length and items[insertIndex].type isnt 'separator'
+        insertIndex++
+
+  insertIndex
+
 Menu = bindings.Menu
 Menu::__proto__ = EventEmitter.prototype
 
@@ -116,14 +147,25 @@ Menu.sendActionToFirstResponder = bindings.sendActionToFirstResponder
 Menu.buildFromTemplate = (template) ->
   throw new TypeError('Invalid template for Menu') unless Array.isArray template
 
-  menu = new Menu
+  positionedTemplate = []
+  insertIndex = 0
+
   for item in template
+    if item.position
+      insertIndex = indexToInsertByPosition positionedTemplate, item.position
+    else
+      # If no |position| is specified, insert after last item.
+      insertIndex++
+    positionedTemplate.splice insertIndex, 0, item
+
+  menu = new Menu
+
+  for item in positionedTemplate
     throw new TypeError('Invalid template for MenuItem') unless typeof item is 'object'
 
     item.submenu = Menu.buildFromTemplate item.submenu if item.submenu?
     menuItem = new MenuItem(item)
     menuItem[key] = value for key, value of item when not menuItem[key]?
-
     menu.append menuItem
 
   menu

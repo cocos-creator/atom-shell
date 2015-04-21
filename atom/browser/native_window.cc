@@ -54,8 +54,9 @@
 #include "ui/gfx/geometry/size_conversions.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
-#include "ui/gfx/screen.h"
 #include "ui/gfx/geometry/size.h"
+#include "ui/gfx/screen.h"
+#include "ui/gl/gpu_switching_manager.h"
 
 #if defined(OS_WIN)
 #include "ui/gfx/switches.h"
@@ -65,10 +66,6 @@ using content::NavigationEntry;
 using content::RenderWidgetHostView;
 using content::RenderWidgetHost;
 
-namespace content {
-CONTENT_EXPORT extern bool g_use_transparent_window;
-}
-
 namespace atom {
 
 namespace {
@@ -77,6 +74,7 @@ namespace {
 const char* kWebRuntimeFeatures[] = {
   switches::kExperimentalFeatures,
   switches::kExperimentalCanvasFeatures,
+  switches::kSubpixelFontScaling,
   switches::kOverlayScrollbars,
   switches::kOverlayFullscreenVideo,
   switches::kSharedWorker,
@@ -114,7 +112,7 @@ NativeWindow::NativeWindow(content::WebContents* web_contents,
 
   // Tell the content module to initialize renderer widget with transparent
   // mode.
-  content::g_use_transparent_window = transparent_;
+  ui::GpuSwitchingManager::SetTransparent(transparent_);
 
   // Read icon before window is created.
   options.Get(switches::kIcon, &icon_);
@@ -146,7 +144,7 @@ NativeWindow::NativeWindow(content::WebContents* web_contents,
   // Override the user agent to contain application and atom-shell's version.
   Browser* browser = Browser::Get();
   std::string product_name = base::StringPrintf(
-      "%s/%s Chrome/%s AtomShell/" ATOM_VERSION_STRING,
+      "%s/%s Chrome/%s " ATOM_PRODUCT_NAME "/" ATOM_VERSION_STRING,
       RemoveWhitespace(browser->GetName()).c_str(),
       browser->GetVersion().c_str(),
       CHROME_VERSION_STRING);
@@ -203,8 +201,8 @@ void NativeWindow::InitFromOptions(const mate::Dictionary& options) {
       options.Get(switches::kMinWidth, &min_width)) {
     SetMinimumSize(gfx::Size(min_width, min_height));
   }
-  int max_height = -1, max_width = -1;
-  if (options.Get(switches::kMaxHeight, &max_height) &&
+  int max_height = INT_MAX, max_width = INT_MAX;
+  if (options.Get(switches::kMaxHeight, &max_height) |
       options.Get(switches::kMaxWidth, &max_width)) {
     SetMaximumSize(gfx::Size(max_width, max_height));
   }
@@ -228,7 +226,7 @@ void NativeWindow::InitFromOptions(const mate::Dictionary& options) {
   if (options.Get(switches::kKiosk, &kiosk) && kiosk) {
     SetKiosk(kiosk);
   }
-  std::string title("Atom Shell");
+  std::string title("Electron");
   options.Get(switches::kTitle, &title);
   SetTitle(title);
 
@@ -283,7 +281,8 @@ bool NativeWindow::HasModalDialog() {
   return has_dialog_attached_;
 }
 
-void NativeWindow::OpenDevTools() {
+void NativeWindow::OpenDevTools(bool can_dock) {
+  inspectable_web_contents()->SetCanDock(can_dock);
   inspectable_web_contents()->ShowDevTools();
 }
 
@@ -296,7 +295,7 @@ bool NativeWindow::IsDevToolsOpened() {
 }
 
 void NativeWindow::InspectElement(int x, int y) {
-  OpenDevTools();
+  OpenDevTools(true);
   scoped_refptr<content::DevToolsAgentHost> agent(
       content::DevToolsAgentHost::GetOrCreateFor(GetWebContents()));
   agent->InspectElement(x, y);
@@ -322,7 +321,7 @@ void NativeWindow::CapturePage(const gfx::Rect& rect,
   RenderWidgetHostView* const view = contents->GetRenderWidgetHostView();
   RenderWidgetHost* const host = view ? view->GetRenderWidgetHost() : nullptr;
   if (!view || !host) {
-    callback.Run(std::vector<unsigned char>());
+    callback.Run(SkBitmap());
     return;
   }
 
@@ -458,8 +457,12 @@ void NativeWindow::OverrideWebkitPrefs(const GURL& url,
   if (web_preferences_.Get("webaudio", &b))
     prefs->webaudio_enabled = b;
   if (web_preferences_.Get("extra-plugin-dirs", &list)) {
-    for (size_t i = 0; i < list.size(); ++i)
-      content::PluginService::GetInstance()->AddExtraPluginDir(list[i]);
+    if (content::PluginService::GetInstance()->NPAPIPluginsSupported()) {
+      for (size_t i = 0; i < list.size(); ++i)
+        content::PluginService::GetInstance()->AddExtraPluginDir(list[i]);
+    } else {
+      LOG(WARNING) << "NPAPI plugins not supported on this platform";
+    }
   }
 }
 
@@ -756,6 +759,10 @@ void NativeWindow::DevToolsAppendToFile(const std::string& url,
   CallDevToolsFunction("DevToolsAPI.appendedToURL", &url_value);
 }
 
+void NativeWindow::DevToolsFocused() {
+  FOR_EACH_OBSERVER(NativeWindowObserver, observers_, OnDevToolsFocus());
+}
+
 void NativeWindow::ScheduleUnresponsiveEvent(int ms) {
   if (!window_unresposive_closure_.IsCancelled())
     return;
@@ -781,11 +788,7 @@ void NativeWindow::NotifyWindowUnresponsive() {
 void NativeWindow::OnCapturePageDone(const CapturePageCallback& callback,
                                      const SkBitmap& bitmap,
                                      content::ReadbackResponse response) {
-  SkAutoLockPixels screen_capture_lock(bitmap);
-  std::vector<unsigned char> data;
-  if (response == content::READBACK_SUCCESS)
-    gfx::PNGCodec::EncodeBGRASkBitmap(bitmap, true, &data);
-  callback.Run(data);
+  callback.Run(bitmap);
 }
 
 void NativeWindow::CallDevToolsFunction(const std::string& function_name,

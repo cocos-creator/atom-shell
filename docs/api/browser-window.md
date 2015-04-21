@@ -84,10 +84,11 @@ You can also create a window without chrome by using
     * `extra-plugin-dirs` Array - Array of paths that would be searched for
       plugins. Note that if you want to add a directory under your app, you
       should use `__dirname` or `process.resourcesPath` to join the paths to
-      make them absolute, using relative paths would make atom-shell search
+      make them absolute, using relative paths would make Electron search
       under current working directory.
     * `experimental-features` Boolean
     * `experimental-canvas-features` Boolean
+    * `subpixel-font-scaling` Boolean
     * `overlay-scrollbars` Boolean
     * `overlay-fullscreen-video` Boolean
     * `shared-worker` Boolean
@@ -115,7 +116,7 @@ would cancel the close.
 
 Usually you would want to use the `beforeunload` handler to decide whether the
 window should be closed, which will also be called when the window is
-reloaded. In atom-shell, returning an empty string or `false` would cancel the
+reloaded. In Electron, returning an empty string or `false` would cancel the
 close. An example is:
 
 ```javascript
@@ -123,7 +124,7 @@ window.onbeforeunload = function(e) {
   console.log('I do not want to be closed');
 
   // Unlike usual browsers, in which a string should be returned and the user is
-  // prompted to confirm the page unload. atom-shell gives the power completely
+  // prompted to confirm the page unload. Electron gives the power completely
   // to the developers, return empty string or false would prevent the unloading
   // now. You can also use the dialog API to let user confirm it.
   return false;
@@ -183,6 +184,10 @@ Emitted when devtools is opened.
 
 Emitted when devtools is closed.
 
+### Event: 'devtools-focused'
+
+Emitted when devtools is focused / opened.
+
 ### Class Method: BrowserWindow.getAllWindows()
 
 Returns an array of all opened browser windows.
@@ -223,14 +228,14 @@ Remove the devtools extension whose name is `name`.
 The `WebContents` object this window owns, all web page related events and
 operations would be done via it.
 
-**Note:** Users should never store this object because it may becomes `null`
-when the web page has crashed.
+**Note:** Users should never store this object because it may become `null`
+when the renderer process (web page) has crashed.
 
 ### BrowserWindow.devToolsWebContents
 
 Get the `WebContents` of devtools of this window.
 
-**Note:** Users should never store this object because it may becomes `null`
+**Note:** Users should never store this object because it may become `null`
 when the devtools has been closed.
 
 ### BrowserWindow.id
@@ -240,16 +245,16 @@ Get the unique ID of this window.
 ### BrowserWindow.destroy()
 
 Force closing the window, the `unload` and `beforeunload` event won't be emitted
-for the web page, and `close` event would also not be emitted for this window,
-but it would guarantee the `closed` event to be emitted.
+for the web page, and `close` event would also not be emitted
+for this window, but it would guarantee the `closed` event to be emitted.
 
-You should only use this method when the web page has crashed.
+You should only use this method when the renderer process (web page) has crashed.
 
 ### BrowserWindow.close()
 
 Try to close the window, this has the same effect with user manually clicking
 the close button of the window. The web page may cancel the close though, see
-the [close event](window#event-close).
+the [close event](#event-close).
 
 ### BrowserWindow.focus()
 
@@ -456,7 +461,10 @@ Whether the window's document has been edited.
 
 __Note__: This API is available only on OS X.
 
-### BrowserWindow.openDevTools()
+### BrowserWindow.openDevTools([options])
+
+* `options` Object
+  * `detach` Boolean - opens devtools in a new window
 
 Opens the developer tools.
 
@@ -489,12 +497,9 @@ Starts inspecting element at position (`x`, `y`).
 * `callback` Function
 
 Captures the snapshot of page within `rect`, upon completion `callback` would be
-called with `callback(image)`, the `image` is a `Buffer` that stores the PNG
-encoded data of the snapshot. Omitting the `rect` would capture the whole
-visible page.
-
-You can write received `image` directly to a `.png` file, or you can base64
-encode it and use data URL to embed the image in HTML.
+called with `callback(image)`, the `image` is an instance of
+[NativeImage](native-image.md) that stores data of the snapshot. Omitting the
+`rect` would capture the whole visible page.
 
 **Note:** Be sure to read documents on remote buffer in
 [remote](remote.md) if you are going to use this API in renderer
@@ -507,7 +512,7 @@ process.
   * `printBackground` Boolean - Also prints the background color and image of
     the web page, defaults to `false`.
 
-Prints window's web page. When `silent` is set to `false`, atom-shell will pick
+Prints window's web page. When `silent` is set to `false`, Electron will pick
 up system's default printer and default settings for printing.
 
 Calling `window.print()` in web page is equivalent to call
@@ -585,6 +590,20 @@ can still bring up the menu bar by pressing the single `Alt` key.
 
 Returns whether the menu bar is visible.
 
+### BrowserWindow.setVisibleOnAllWorkspaces(visible)
+
+* `visible` Boolean
+
+Sets whether the window should be visible on all workspaces.
+
+**Note:** This API does nothing on Windows.
+
+### BrowserWindow.isVisibleOnAllWorkspaces()
+
+Returns whether the window is visible on all workspaces.
+
+**Note:** This API always returns false on Windows.
+
 ## Class: WebContents
 
 A `WebContents` is responsible for rendering and controlling a web page.
@@ -620,6 +639,19 @@ Corresponds to the points in time when the spinner of the tab starts spinning.
 ### Event: 'did-stop-loading'
 
 Corresponds to the points in time when the spinner of the tab stops spinning.
+
+### Event: 'did-get-response-details'
+
+* `event` Event
+* `status` Boolean
+* `newUrl` String
+* `originalUrl` String
+* `httpResponseCode` Integer
+* `requestMethod` String
+* `referrer` String
+
+Emitted when details regarding a requested resource is available.
+`status` indicates the socket connection to download the resource.
 
 ### Event: 'did-get-redirect-request'
 
@@ -809,10 +841,10 @@ Executes editing command `replaceMisspelling` in page.
 Send `args..` to the web page via `channel` in asynchronous message, the web
 page can handle it by listening to the `channel` event of `ipc` module.
 
-An example of sending messages from browser side to web pages:
+An example of sending messages from the main process to the renderer process:
 
 ```javascript
-// On browser side.
+// On the main process.
 var window = null;
 app.on('ready', function() {
   window = new BrowserWindow({width: 800, height: 600});
@@ -839,6 +871,6 @@ app.on('ready', function() {
 **Note:**
 
 1. The IPC message handler in web pages do not have a `event` parameter, which
-   is different from the handlers on browser side.
-2. There is no way to send synchronous messages from browser side to web pages,
-   because it would be very easy to cause dead locks.
+   is different from the handlers on the main process.
+2. There is no way to send synchronous messages from the main process to a
+   renderer process, because it would be very easy to cause dead locks.

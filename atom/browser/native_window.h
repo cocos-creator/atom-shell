@@ -59,8 +59,7 @@ class NativeWindow : public brightray::DefaultWebContentsDelegate,
                      public content::WebContentsObserver,
                      public content::NotificationObserver {
  public:
-  typedef base::Callback<void(const std::vector<unsigned char>& buffer)>
-      CapturePageCallback;
+  typedef base::Callback<void(const SkBitmap& bitmap)> CapturePageCallback;
 
   class DialogScope {
    public:
@@ -145,9 +144,11 @@ class NativeWindow : public brightray::DefaultWebContentsDelegate,
   virtual void SetProgressBar(double progress) = 0;
   virtual void SetOverlayIcon(const gfx::Image& overlay,
                               const std::string& description) = 0;
+  virtual void SetVisibleOnAllWorkspaces(bool visible) = 0;
+  virtual bool IsVisibleOnAllWorkspaces() = 0;
 
   virtual bool IsClosed() const { return is_closed_; }
-  virtual void OpenDevTools();
+  virtual void OpenDevTools(bool can_dock);
   virtual void CloseDevTools();
   virtual bool IsDevToolsOpened();
   virtual void InspectElement(int x, int y);
@@ -289,6 +290,7 @@ class NativeWindow : public brightray::DefaultWebContentsDelegate,
                           bool save_as) override;
   void DevToolsAppendToFile(const std::string& url,
                             const std::string& content) override;
+  void DevToolsFocused() override;
 
   // Whether window has standard frame.
   bool has_frame_;

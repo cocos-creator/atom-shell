@@ -5,7 +5,8 @@ import hashlib
 import os
 import tempfile
 
-from lib.util import download, rm_rf, s3_config, s3put
+from lib.config import s3_config
+from lib.util import download, rm_rf, s3put
 
 
 DIST_URL = 'https://atom.io/download/atom-shell/'
@@ -44,7 +45,7 @@ def get_files_list(version):
 
 
 def download_files(url, files):
-  directory = tempfile.mkdtemp(prefix='atom-shell-tmp')
+  directory = tempfile.mkdtemp(prefix='electron-tmp')
   return directory, [
     download(f, url + f, os.path.join(directory, f))
     for f in files

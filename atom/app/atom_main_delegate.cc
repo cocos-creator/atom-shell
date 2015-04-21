@@ -27,8 +27,8 @@ AtomMainDelegate::~AtomMainDelegate() {
 
 bool AtomMainDelegate::BasicStartupComplete(int* exit_code) {
   // Disable logging out to debug.log on Windows
-#if defined(OS_WIN)
   logging::LoggingSettings settings;
+#if defined(OS_WIN)
 #if defined(DEBUG)
   settings.logging_dest = logging::LOG_TO_ALL;
   settings.log_file = L"debug.log";
@@ -36,15 +36,15 @@ bool AtomMainDelegate::BasicStartupComplete(int* exit_code) {
   settings.delete_old = logging::DELETE_OLD_LOG_FILE;
 #else
   settings.logging_dest = logging::LOG_TO_SYSTEM_DEBUG_LOG;
-#endif
-  logging::InitLogging(settings);
+#endif  // defined(DEBUG)
 #endif  // defined(OS_WIN)
+  logging::InitLogging(settings);
 
   // Logging with pid and timestamp.
   logging::SetLogItems(true, false, true, false);
 
-  // Enable convient stack printing.
 #if defined(DEBUG) && defined(OS_LINUX)
+  // Enable convient stack printing.
   base::debug::EnableInProcessStackDumping();
 #endif
 
@@ -67,9 +67,6 @@ void AtomMainDelegate::PreSandboxStartup() {
   if (!process_type.empty())
     return;
 
-  // Add a flag to mark the start of switches added by atom-shell.
-  command_line->AppendSwitch("atom-shell-switches-start");
-
 #if defined(OS_WIN)
   // Disable the LegacyRenderWidgetHostHWND, it made frameless windows unable
   // to move and resize. We may consider enabling it again after upgraded to
@@ -84,9 +81,6 @@ void AtomMainDelegate::PreSandboxStartup() {
   // Enable AVFoundation.
   command_line->AppendSwitch("enable-avfoundation");
 #endif
-
-  // Add a flag to mark the end of switches added by atom-shell.
-  command_line->AppendSwitch("atom-shell-switches-end");
 }
 
 content::ContentBrowserClient* AtomMainDelegate::CreateContentBrowserClient() {

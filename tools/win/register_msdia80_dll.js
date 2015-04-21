@@ -7,6 +7,6 @@ var target = 'C:\\Program Files\\Common Files\\Microsoft Shared\\VC\\msdia80.dll
 if (fs.existsSync(target))
   return;
 
-var copy = 'copy "' + source + '" "' + target + '"';
-var register = 'regsvr32 "' + target + '"';
-runas('cmd', ['/K', copy + ' & ' + register + ' & exit']);
+runas('cmd',
+      ['/K', 'copy', source, target, '&', 'regsvr32', '/s', target, '&', 'exit'],
+      {admin: true});

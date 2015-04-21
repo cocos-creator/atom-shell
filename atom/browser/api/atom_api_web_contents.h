@@ -161,6 +161,8 @@ class WebContents : public mate::EventEmitter,
                               const base::string16& error_description) override;
   void DidStartLoading(content::RenderViewHost* render_view_host) override;
   void DidStopLoading(content::RenderViewHost* render_view_host) override;
+  void DidGetResourceResponseStart(
+      const content::ResourceRequestDetails& details) override;
   void DidGetRedirectForResourceRequest(
       content::RenderFrameHost* render_frame_host,
       const content::ResourceRedirectDetails& details) override;
@@ -172,6 +174,7 @@ class WebContents : public mate::EventEmitter,
   void WebContentsDestroyed() override;
   void NavigationEntryCommitted(
       const content::LoadCommittedDetails& load_details) override;
+  void TitleWasSet(content::NavigationEntry* entry, bool explicit_set) override;
 
   // content::BrowserPluginGuestDelegate:
   void DidAttach(int guest_proxy_routing_id) final;

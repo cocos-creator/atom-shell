@@ -1,7 +1,7 @@
 # `<webview>` tag
 
 Use the `webview` tag to embed 'guest' content (such as web pages) in your
-atom-shell app. The guest content is contained within the `webview` container;
+Electron app. The guest content is contained within the `webview` container;
 an embedder page within your app controls how the guest content is laid out and
 rendered.
 
@@ -302,6 +302,18 @@ Corresponds to the points in time when the spinner of the tab starts spinning.
 
 Corresponds to the points in time when the spinner of the tab stops spinning.
 
+### did-get-response-details
+
+* `status` Boolean
+* `newUrl` String
+* `originalUrl` String
+* `httpResponseCode` Integer
+* `requestMethod` String
+* `referrer` String
+
+Fired when details regarding a requested resource is available.
+`status` indicates socket connection to download the resource.
+
 ### did-get-redirect-request
 
 * `oldUrl` String
@@ -309,6 +321,14 @@ Corresponds to the points in time when the spinner of the tab stops spinning.
 * `isMainFrame` Boolean
 
 Fired when a redirect was received while requesting a resource.
+
+### page-title-set
+
+* `title` String
+* `explicitSet` Boolean
+
+Fired when page title is set during navigation. `explicitSet` is false when title is synthesised from file
+url.
 
 ### console-message
 

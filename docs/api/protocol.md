@@ -1,7 +1,7 @@
 # protocol
 
 The `protocol` module can register a new protocol or intercept an existing
-protocol, so you can custom the response to the requests for various protocols.
+protocol, so you can customize the response to the requests for various protocols.
 
 An example of implementing a protocol that has the same effect with the
 `file://` protocol:
@@ -10,7 +10,7 @@ An example of implementing a protocol that has the same effect with the
 var app = require('app'),
     path = require('path');
 
-app.on('will-finish-launching', function() {
+app.on('ready', function() {
     var protocol = require('protocol');
     protocol.registerProtocol('atom', function(request) {
       var url = request.url.substr(7)
@@ -19,7 +19,7 @@ app.on('will-finish-launching', function() {
 });
 ```
 
-**Note:** This module can only be used after the `will-finish-launching` event
+**Note:** This module can only be used after the `ready` event
 was emitted.
 
 ## protocol.registerProtocol(scheme, handler)
@@ -74,3 +74,12 @@ mime types.
   * `data` String
 
 Create a request job which sends a string as response.
+
+## Class: protocol.RequestBufferJob(options)
+
+* `options` Object
+  * `mimeType` String - Default is `application/octet-stream`
+  * `encoding` String - Default is `UTF-8`
+  * `data` Buffer
+
+Create a request job which accepts a buffer and sends a string as response.

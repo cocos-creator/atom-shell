@@ -7,7 +7,7 @@
   <key>CFBundleExecutable</key>
   <string>${PRODUCT_NAME}</string>
   <key>CFBundleIdentifier</key>
-  <string>com.github.atom-shell</string>
+  <string>${ATOM_BUNDLE_ID}</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
@@ -17,7 +17,7 @@
   <key>CFBundleIconFile</key>
   <string>atom.icns</string>
   <key>CFBundleVersion</key>
-  <string>0.22.1</string>
+  <string>0.24.0</string>
   <key>LSMinimumSystemVersion</key>
   <string>10.8.0</string>
   <key>NSMainNibFile</key>

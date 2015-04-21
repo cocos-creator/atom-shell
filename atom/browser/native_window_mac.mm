@@ -11,6 +11,7 @@
 #include "atom/common/options_switches.h"
 #include "base/mac/mac_util.h"
 #include "base/strings/sys_string_conversions.h"
+#include "content/public/browser/browser_accessibility_state.h"
 #include "content/public/browser/native_web_keyboard_event.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/render_view_host.h"
@@ -140,7 +141,6 @@ static const CGFloat kAtomWindowCornerRadius = 4.0;
 
 - (void)windowWillClose:(NSNotification*)notification {
   shell_->NotifyWindowClosed();
-  [self autorelease];
 }
 
 - (BOOL)windowShouldClose:(id)window {
@@ -191,21 +191,27 @@ static const CGFloat kAtomWindowCornerRadius = 4.0;
 }
 
 - (IBAction)showDevTools:(id)sender {
-  shell_->OpenDevTools();
+  shell_->OpenDevTools(true);
 }
 
-// Returns an empty array for AXChildren attribute, this will force the
-// SpeechSynthesisServer to use its classical way of speaking the selected text:
-// by invoking the "Command+C" for current application and then speak out
-// what's in the clipboard. Otherwise the "Text to Speech" would always speak
-// out window's title.
-// This behavior is taken by both FireFox and Chrome, see also FireFox's bug on
-// more of how SpeechSynthesisServer chose which text to read:
-// https://bugzilla.mozilla.org/show_bug.cgi?id=674612
 - (id)accessibilityAttributeValue:(NSString*)attribute {
-  if ([attribute isEqualToString:@"AXChildren"])
-    return [NSArray array];
-  return [super accessibilityAttributeValue:attribute];
+  if (![attribute isEqualToString:@"AXChildren"])
+    return [super accessibilityAttributeValue:attribute];
+
+  // Filter out objects that aren't the title bar buttons. This has the effect
+  // of removing the window title, which VoiceOver already sees.
+  // * when VoiceOver is disabled, this causes Cmd+C to be used for TTS but
+  //   still leaves the buttons available in the accessibility tree.
+  // * when VoiceOver is enabled, the full accessibility tree is used.
+  // Without removing the title and with VO disabled, the TTS would always read
+  // the window title instead of using Cmd+C to get the selected text.
+  NSPredicate *predicate = [NSPredicate predicateWithFormat:
+      @"(self isKindOfClass: %@) OR (self.className == %@)",
+      [NSButtonCell class],
+      @"RenderWidgetHostViewCocoa"];
+
+  NSArray *children = [super accessibilityAttributeValue:attribute];
+  return [children filteredArrayUsingPredicate:predicate];
 }
 
 @end
@@ -241,6 +247,10 @@ static const CGFloat kAtomWindowCornerRadius = 4.0;
 
 - (void)mouseDragged:(NSEvent*)event {
   shellWindow_->HandleMouseEvent(event);
+}
+
+- (BOOL)acceptsFirstMouse:(NSEvent*)event {
+  return YES;
 }
 
 @end
@@ -319,21 +329,18 @@ NativeWindowMac::NativeWindowMac(content::WebContents* web_contents,
       width,
       height);
 
-  AtomNSWindow* atomWindow = [[AtomNSWindow alloc]
+  window_.reset([[AtomNSWindow alloc]
       initWithContentRect:cocoa_bounds
                 styleMask:NSTitledWindowMask | NSClosableWindowMask |
                           NSMiniaturizableWindowMask | NSResizableWindowMask |
                           NSTexturedBackgroundWindowMask
                   backing:NSBackingStoreBuffered
-                    defer:YES];
+                    defer:YES]);
+  [window_ setShell:this];
+  [window_ setEnableLargerThanScreen:enable_larger_than_screen_];
 
-  [atomWindow setShell:this];
-  [atomWindow setEnableLargerThanScreen:enable_larger_than_screen_];
-  window_.reset(atomWindow);
-
-  AtomNSWindowDelegate* delegate =
-      [[AtomNSWindowDelegate alloc] initWithShell:this];
-  [window_ setDelegate:delegate];
+  window_delegate_.reset([[AtomNSWindowDelegate alloc] initWithShell:this]);
+  [window_ setDelegate:window_delegate_];
 
   if (transparent_) {
     // Make window has transparent background.
@@ -354,7 +361,7 @@ NativeWindowMac::NativeWindowMac(content::WebContents* web_contents,
   // Enable the NSView to accept first mouse event.
   bool acceptsFirstMouse = false;
   options.Get(switches::kAcceptFirstMouse, &acceptsFirstMouse);
-  [delegate setAcceptsFirstMouse:acceptsFirstMouse];
+  [window_delegate_ setAcceptsFirstMouse:acceptsFirstMouse];
 
   // Disable fullscreen button when 'fullscreen' is specified to false.
   bool fullscreen;
@@ -692,6 +699,21 @@ void NativeWindowMac::ShowDefinitionForSelection() {
   rwhv->ShowDefinitionForSelection();
 }
 
+void NativeWindowMac::SetVisibleOnAllWorkspaces(bool visible) {
+  NSUInteger collectionBehavior = [window_ collectionBehavior];
+  if (visible) {
+    collectionBehavior |= NSWindowCollectionBehaviorCanJoinAllSpaces;
+  } else {
+    collectionBehavior &= ~NSWindowCollectionBehaviorCanJoinAllSpaces;
+  }
+  [window_ setCollectionBehavior:collectionBehavior];
+}
+
+bool NativeWindowMac::IsVisibleOnAllWorkspaces() {
+  NSUInteger collectionBehavior = [window_ collectionBehavior];
+  return collectionBehavior & NSWindowCollectionBehaviorCanJoinAllSpaces;
+}
+
 bool NativeWindowMac::IsWithinDraggableRegion(NSPoint point) const {
   if (!draggable_region_)
     return false;
@@ -739,7 +761,7 @@ void NativeWindowMac::HandleKeyboardEvent(
       event.type == content::NativeWebKeyboardEvent::Char)
     return;
 
-  if (event.os_event.window == window_) {
+  if (event.os_event.window == window_.get()) {
     EventProcessingWindow* event_window =
         static_cast<EventProcessingWindow*>(window_);
     DCHECK([event_window isKindOfClass:[EventProcessingWindow class]]);
@@ -805,7 +827,10 @@ void NativeWindowMac::UninstallView() {
 }
 
 void NativeWindowMac::ClipWebView() {
-  NSView* webView = GetWebContents()->GetNativeView();
+  content::WebContents* web_contents = GetWebContents();
+  if (!web_contents)
+    return;
+  NSView* webView = web_contents->GetNativeView();
   webView.layer.masksToBounds = YES;
   webView.layer.cornerRadius = kAtomWindowCornerRadius;
 }

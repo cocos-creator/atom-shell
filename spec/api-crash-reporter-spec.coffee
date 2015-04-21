@@ -17,6 +17,9 @@ describe 'crash-reporter module', ->
   beforeEach -> w = new BrowserWindow(show: false)
   afterEach -> w.destroy()
 
+  # It is not working on 64bit Windows.
+  return if process.platform is 'win32' and process.arch is 'x64'
+
   it 'should send minidump when renderer crashes', (done) ->
     @timeout 60000
     server = http.createServer (req, res) ->
@@ -24,8 +27,8 @@ describe 'crash-reporter module', ->
       process.throwDeprecation = false
       form.parse req, (error, fields, files) ->
         process.throwDeprecation = true
-        assert.equal fields['prod'], 'Atom-Shell'
-        assert.equal fields['ver'], process.versions['atom-shell']
+        assert.equal fields['prod'], 'Electron'
+        assert.equal fields['ver'], process.versions['electron']
         assert.equal fields['process_type'], 'renderer'
         assert.equal fields['platform'], process.platform
         assert.equal fields['extra1'], 'extra1'

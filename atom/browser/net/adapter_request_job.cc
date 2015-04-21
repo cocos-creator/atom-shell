@@ -8,6 +8,7 @@
 #include "atom/browser/net/url_request_string_job.h"
 #include "atom/browser/net/asar/url_request_asar_job.h"
 #include "atom/common/asar/asar_util.h"
+#include "atom/browser/net/url_request_buffer_job.h"
 #include "content/public/browser/browser_thread.h"
 #include "net/base/net_errors.h"
 #include "net/url_request/url_request_error_job.h"
@@ -87,34 +88,25 @@ void AdapterRequestJob::CreateStringJobAndStart(const std::string& mime_type,
   real_job_->Start();
 }
 
-void AdapterRequestJob::CreateFileJobAndStart(const base::FilePath& path) {
+void AdapterRequestJob::CreateBufferJobAndStart(const std::string& mime_type,
+                                                const std::string& charset,
+                                                v8::Local<v8::Object> buffer) {
   DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::IO));
 
-  base::FilePath asar_path, relative_path;
-  if (!asar::GetAsarArchivePath(path, &asar_path, &relative_path)) {
-    real_job_ = new net::URLRequestFileJob(
-        request(),
-        network_delegate(),
-        path,
-        content::BrowserThread::GetBlockingPool()->
-            GetTaskRunnerWithShutdownBehavior(
-                base::SequencedWorkerPool::SKIP_ON_SHUTDOWN));
-  } else {
-    auto archive = asar::GetOrCreateAsarArchive(asar_path);
-    if (archive)
-      real_job_ = new asar::URLRequestAsarJob(
-          request(),
-          network_delegate(),
-          archive,
-          relative_path,
-          content::BrowserThread::GetBlockingPool()->
-              GetTaskRunnerWithShutdownBehavior(
-                  base::SequencedWorkerPool::SKIP_ON_SHUTDOWN));
-    else
-      real_job_ = new net::URLRequestErrorJob(
-          request(), network_delegate(), net::ERR_FILE_NOT_FOUND);
-  }
+  real_job_ = new URLRequestBufferJob(
+      request(), network_delegate(), mime_type, charset, buffer);
+  real_job_->Start();
+}
 
+void AdapterRequestJob::CreateFileJobAndStart(const base::FilePath& path) {
+  DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::IO));
+  real_job_ = asar::CreateJobFromPath(
+      path,
+      request(),
+      network_delegate(),
+      content::BrowserThread::GetBlockingPool()->
+          GetTaskRunnerWithShutdownBehavior(
+              base::SequencedWorkerPool::SKIP_ON_SHUTDOWN));
   real_job_->Start();
 }
 

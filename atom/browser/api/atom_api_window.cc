@@ -53,10 +53,10 @@ namespace {
 void OnCapturePageDone(
     v8::Isolate* isolate,
     const base::Callback<void(const gfx::Image&)>& callback,
-    const std::vector<unsigned char>& data) {
+    const SkBitmap& bitmap) {
   v8::Locker locker(isolate);
   v8::HandleScope handle_scope(isolate);
-  callback.Run(gfx::Image::CreateFrom1xPNGBytes(&data.front(), data.size()));
+  callback.Run(gfx::Image::CreateFrom1xBitmap(bitmap));
 }
 
 }  // namespace
@@ -139,16 +139,18 @@ void Window::OnRendererResponsive() {
   Emit("responsive");
 }
 
+void Window::OnDevToolsFocus() {
+  Emit("devtools-focused");
+}
+
 // static
 mate::Wrappable* Window::New(v8::Isolate* isolate,
                              const mate::Dictionary& options) {
-  if (Browser::Get()->is_ready()) {
-    return new Window(options);
-  } else {
-    isolate->ThrowException(v8::Exception::TypeError(mate::StringToV8(
-        isolate, "Can not create BrowserWindow before app is ready")));
+  if (!Browser::Get()->is_ready()) {
+    node::ThrowError("Cannot create BrowserWindow before app is ready");
     return nullptr;
   }
+  return new Window(options);
 }
 
 void Window::Destroy() {
@@ -324,8 +326,8 @@ bool Window::IsKiosk() {
   return window_->IsKiosk();
 }
 
-void Window::OpenDevTools() {
-  window_->OpenDevTools();
+void Window::OpenDevTools(bool can_dock) {
+  window_->OpenDevTools(can_dock);
 }
 
 void Window::CloseDevTools() {
@@ -424,6 +426,14 @@ void Window::ShowDefinitionForSelection() {
 }
 #endif
 
+void Window::SetVisibleOnAllWorkspaces(bool visible) {
+  return window_->SetVisibleOnAllWorkspaces(visible);
+}
+
+bool Window::IsVisibleOnAllWorkspaces() {
+  return window_->IsVisibleOnAllWorkspaces();
+}
+
 mate::Handle<WebContents> Window::GetWebContents(v8::Isolate* isolate) const {
   return WebContents::CreateFrom(isolate, window_->GetWebContents());
 }
@@ -494,6 +504,10 @@ void Window::BuildPrototype(v8::Isolate* isolate,
       .SetMethod("isMenuBarAutoHide", &Window::IsMenuBarAutoHide)
       .SetMethod("setMenuBarVisibility", &Window::SetMenuBarVisibility)
       .SetMethod("isMenuBarVisible", &Window::IsMenuBarVisible)
+      .SetMethod("setVisibleOnAllWorkspaces",
+                 &Window::SetVisibleOnAllWorkspaces)
+      .SetMethod("isVisibleOnAllWorkspaces",
+                 &Window::IsVisibleOnAllWorkspaces)
 #if defined(OS_MACOSX)
       .SetMethod("showDefinitionForSelection",
                  &Window::ShowDefinitionForSelection)

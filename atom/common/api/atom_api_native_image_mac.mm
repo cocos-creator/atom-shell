@@ -10,9 +10,8 @@ namespace atom {
 
 namespace api {
 
-// static
-void NativeImage::MakeTemplateImage(gfx::Image* image) {
-  [image->AsNSImage() setTemplate:YES];
+void NativeImage::SetTemplateImage(bool setAsTemplate) {
+  [image_.AsNSImage() setTemplate:setAsTemplate];
 }
 
 }  // namespace api

@@ -9,12 +9,15 @@ WEB_VIEW_EVENTS =
   'did-frame-finish-load': ['isMainFrame']
   'did-start-loading': []
   'did-stop-loading': []
+  'did-get-response-details': ['status', 'newUrl', 'originalUrl',
+                               'httpResponseCode', 'requestMethod', 'referrer']
   'did-get-redirect-request': ['oldUrl', 'newUrl', 'isMainFrame']
   'console-message': ['level', 'message', 'line', 'sourceId']
   'new-window': ['url', 'frameName', 'disposition']
   'close': []
   'crashed': []
   'destroyed': []
+  'page-title-set': ['title', 'explicitSet']
 
 dispatchEvent = (webView, event, args...) ->
   throw new Error("Unkown event #{event}") unless WEB_VIEW_EVENTS[event]?
@@ -39,6 +42,11 @@ module.exports =
       for f, i in ['oldWidth', 'oldHeight', 'newWidth', 'newHeight']
         domEvent[f] = args[i]
       webView.onSizeChanged domEvent
+
+  deregisterEvents: (viewInstanceId) ->
+    ipc.removeAllListeners "ATOM_SHELL_GUEST_VIEW_INTERNAL_DISPATCH_EVENT-#{viewInstanceId}"
+    ipc.removeAllListeners "ATOM_SHELL_GUEST_VIEW_INTERNAL_IPC_MESSAGE-#{viewInstanceId}"
+    ipc.removeAllListeners "ATOM_SHELL_GUEST_VIEW_INTERNAL_SIZE_CHANGED-#{viewInstanceId}"
 
   createGuest: (type, params, callback) ->
     requestId++
