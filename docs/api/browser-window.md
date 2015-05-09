@@ -54,9 +54,10 @@ You can also create a window without chrome by using
   * `frame` Boolean - Specify `false` to create a
     [Frameless Window](frameless-window.md)
   * `node-integration` Boolean - Whether node integration is enabled, default
-     is `true`
+    is `true`
   * `accept-first-mouse` Boolean - Whether the web view accepts a single
-     mouse-down event that simultaneously activates the window
+    mouse-down event that simultaneously activates the window
+  * `disable-auto-hide-cursor` Boolean - Do not hide cursor when typing
   * `auto-hide-menu-bar` Boolean - Auto hide the menu bar unless the `Alt`
     key is pressed.
   * `enable-larger-than-screen` Boolean - Enable the window to be resized larger
@@ -314,6 +315,20 @@ Sets whether the window should be in fullscreen mode.
 ### BrowserWindow.isFullScreen()
 
 Returns whether the window is in fullscreen mode.
+
+### BrowserWindow.setBounds(options)
+
+* `options` Object
+  * `x` Integer
+  * `y` Integer
+  * `width` Integer
+  * `height` Integer
+
+Resizes and moves the window to `width`, `height`, `x`, `y`.
+
+### BrowserWindow.getBounds()
+
+Returns an object that contains window's width, height, x and y values.
 
 ### BrowserWindow.setSize(width, height)
 
@@ -662,6 +677,19 @@ Emitted when details regarding a requested resource is available.
 
 Emitted when a redirect was received while requesting a resource.
 
+### Event: 'dom-ready'
+
+* `event` Event
+
+Emitted when document in the given frame is loaded.
+
+### Event: 'page-favicon-updated'
+
+* `event` Event
+* `favicons` Array - Array of Urls
+
+Emitted when page receives favicon urls.
+
 ### Event: 'new-window'
 
 * `event` Event
@@ -712,6 +740,10 @@ Returns URL of current web page.
 ### WebContents.getTitle()
 
 Returns the title of web page.
+
+### WebContents.getFavicon()
+
+Returns the favicon of web page as [NativeImage](native-image.md).
 
 ### WebContents.isLoading()
 
@@ -833,6 +865,21 @@ Executes editing command `replace` in page.
 * `text` String
 
 Executes editing command `replaceMisspelling` in page.
+
+### WebContents.hasServiceWorker(callback)
+
+* `callback` Function
+
+Checks if any serviceworker is registered and returns boolean as
+response to `callback`.
+
+### WebContents.unregisterServiceWorker(callback)
+
+* `callback` Function
+
+Unregisters any serviceworker if present and returns boolean as
+response to `callback` when the JS promise is fullfilled or false
+when the JS promise is rejected.  
 
 ### WebContents.send(channel[, args...])
 

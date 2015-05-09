@@ -1,6 +1,5 @@
 {
   'variables': {
-# <<<<<<< HEAD
 #     'includes': [
 #       'vendor/native_mate/native_mate_files.gypi',
 #     ],
@@ -8,8 +7,7 @@
     'product_name%': 'Fireball',
     'company_name%': 'Firebox Technology',
     'company_abbr%': 'firebox',
-    'version%': '0.24.0',
-
+    'version%': '0.25.3',
 #     'app_sources': [
 #       'atom/app/atom_main.cc',
 #       'atom/app/atom_main.h',
@@ -486,15 +484,6 @@
           ],
         }],  # OS!="mac"
         ['OS=="win"', {
-          'msvs_settings': {
-            'VCLinkerTool': {
-              'AdditionalOptions': [
-                # Force linking even though we have duplicate symbols between
-                # BoringSSL and OpenSSL.
-                '/FORCE:MULTIPLE',
-              ],
-            },
-          },
           'copies': [
             {
               'variables': {
