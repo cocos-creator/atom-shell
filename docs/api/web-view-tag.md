@@ -112,6 +112,14 @@ after this script has done execution.
 
 Sets the referrer URL for the guest page.
 
+### useragent
+
+```html
+<webview src="https://www.github.com/" useragent="Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; AS; rv:11.0) like Gecko"></webview>
+```
+
+Sets the user agent for the guest page before the page is navigated to. Once the page is loaded, use the `setUserAgent` method to change the user agent.
+
 ### disablewebsecurity
 
 ```html
@@ -129,10 +137,6 @@ Returns URL of guest page.
 ### `<webview>`.getTitle()
 
 Returns the title of guest page.
-
-### `<webview>`.getFavicon()
-
-Returns the favicon of guest page as dataUrl.
 
 ### `<webview>`.isLoading()
 
@@ -168,6 +172,10 @@ Returns whether guest page can go forward.
 * `offset` Integer
 
 Returns whether guest page can go to `offset`.
+
+### `<webview>`.clearHistory()
+
+Clears the navigation history.
 
 ### `<webview>`.goBack()
 
@@ -250,6 +258,10 @@ Executes editing command `copy` in page.
 
 Executes editing command `paste` in page.
 
+### `<webview>`.pasteAndMatchStyle()
+
+Executes editing command `pasteAndMatchStyle` in page.
+
 ### `<webview>`.delete()
 
 Executes editing command `delete` in page.
@@ -321,9 +333,11 @@ Corresponds to the points in time when the spinner of the tab stops spinning.
 * `httpResponseCode` Integer
 * `requestMethod` String
 * `referrer` String
+* `headers` String
 
 Fired when details regarding a requested resource is available.
 `status` indicates socket connection to download the resource.
+`headers` is key-value string separated by new-line character.
 
 ### did-get-redirect-request
 
@@ -350,6 +364,14 @@ url.
 * `favicons` Array - Array of Urls
 
 Fired when page receives favicon urls.
+
+### enter-html-full-screen
+
+Fired when page enters fullscreen triggered by html api.
+
+### leave-html-full-screen
+
+Fired when page leaves fullscreen triggered by html api.
 
 ### console-message
 
@@ -429,6 +451,17 @@ ipc.on('ping', function() {
 ### crashed
 
 Fired when the renderer process is crashed.
+
+### gpu-crashed
+
+Fired when the gpu process is crashed.
+
+### plugin-crashed
+
+* `name` String
+* `version` String
+
+Fired when a plugin process is crashed.
 
 ### destroyed
 

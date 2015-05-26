@@ -14,6 +14,7 @@
 #include "content/public/common/favicon_url.h"
 #include "content/public/browser/web_contents_delegate.h"
 #include "content/public/browser/web_contents_observer.h"
+#include "content/public/browser/gpu_data_manager_observer.h"
 #include "native_mate/handle.h"
 #include "ui/gfx/image/image.h"
 
@@ -35,7 +36,8 @@ namespace api {
 class WebContents : public mate::EventEmitter,
                     public content::BrowserPluginGuestDelegate,
                     public content::WebContentsDelegate,
-                    public content::WebContentsObserver {
+                    public content::WebContentsObserver,
+                    public content::GpuDataManagerObserver {
  public:
   // Create from an existing WebContents.
   static mate::Handle<WebContents> CreateFrom(
@@ -49,11 +51,13 @@ class WebContents : public mate::EventEmitter,
   bool IsAlive() const;
   void LoadURL(const GURL& url, const mate::Dictionary& options);
   base::string16 GetTitle() const;
-  gfx::Image GetFavicon() const;
   bool IsLoading() const;
   bool IsWaitingForResponse() const;
   void Stop();
   void ReloadIgnoringCache();
+  void GoBack();
+  void GoForward();
+  void GoToOffset(int offset);
   int GetRoutingID() const;
   int GetProcessID() const;
   bool IsCrashed() const;
@@ -73,6 +77,7 @@ class WebContents : public mate::EventEmitter,
   void Cut();
   void Copy();
   void Paste();
+  void PasteAndMatchStyle();
   void Delete();
   void SelectAll();
   void Unselect();
@@ -146,6 +151,11 @@ class WebContents : public mate::EventEmitter,
   void HandleKeyboardEvent(
       content::WebContents* source,
       const content::NativeWebKeyboardEvent& event) override;
+  void EnterFullscreenModeForTab(content::WebContents* source,
+                                 const GURL& origin) override;
+  void ExitFullscreenModeForTab(content::WebContents* source) override;
+  bool IsFullscreenForTabOrPending(
+      const content::WebContents* source) const override;
 
   // content::WebContentsObserver:
   void RenderViewDeleted(content::RenderViewHost*) override;
@@ -162,8 +172,8 @@ class WebContents : public mate::EventEmitter,
                               const GURL& validated_url,
                               int error_code,
                               const base::string16& error_description) override;
-  void DidStartLoading(content::RenderViewHost* render_view_host) override;
-  void DidStopLoading(content::RenderViewHost* render_view_host) override;
+  void DidStartLoading() override;
+  void DidStopLoading() override;
   void DidGetResourceResponseStart(
       const content::ResourceRequestDetails& details) override;
   void DidGetRedirectForResourceRequest(
@@ -180,17 +190,21 @@ class WebContents : public mate::EventEmitter,
   void TitleWasSet(content::NavigationEntry* entry, bool explicit_set) override;
   void DidUpdateFaviconURL(
       const std::vector<content::FaviconURL>& urls) override;
+  void PluginCrashed(const base::FilePath& plugin_path,
+                     base::ProcessId plugin_pid) override;
 
   // content::BrowserPluginGuestDelegate:
   void DidAttach(int guest_proxy_routing_id) final;
   void ElementSizeChanged(const gfx::Size& size) final;
   content::WebContents* GetOwnerWebContents() const final;
   void GuestSizeChanged(const gfx::Size& new_size) final;
-  void RegisterDestructionCallback(const DestructionCallback& callback) final;
-  void SetGuestSizer(content::GuestSizer* guest_sizer) final;
+  void SetGuestHost(content::GuestHost* guest_host) final;
   void WillAttach(content::WebContents* embedder_web_contents,
                   int element_instance_id,
                   bool is_full_page_plugin) final;
+
+  // content::GpuDataManagerObserver:
+  void OnGpuProcessCrashed(base::TerminationStatus exit_code) override;
 
  private:
   // Called when received a message from renderer.
@@ -215,8 +229,6 @@ class WebContents : public mate::EventEmitter,
   // element.
   int element_instance_id_;
 
-  DestructionCallback destruction_callback_;
-
   // Stores whether the contents of the guest can be transparent.
   bool guest_opaque_;
 
@@ -233,8 +245,8 @@ class WebContents : public mate::EventEmitter,
   // element may not match the size of the guest.
   gfx::Size guest_size_;
 
-  // A pointer to the guest_sizer.
-  content::GuestSizer* guest_sizer_;
+  // A pointer to the guest_host.
+  content::GuestHost* guest_host_;
 
   // Indicates whether autosize mode is enabled or not.
   bool auto_size_enabled_;

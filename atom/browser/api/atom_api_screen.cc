@@ -48,6 +48,7 @@ std::vector<std::string> MetricsToArray(uint32_t metrics) {
 }  // namespace
 
 Screen::Screen(gfx::Screen* screen) : screen_(screen) {
+  displays_ = screen_->GetAllDisplays();
   screen_->AddObserver(this);
 }
 
@@ -64,11 +65,6 @@ gfx::Display Screen::GetPrimaryDisplay() {
 }
 
 std::vector<gfx::Display> Screen::GetAllDisplays() {
-  // The Screen::GetAllDisplays doesn't update when there is display added or
-  // removed, so we have to manually maintain the displays_ to make it up to
-  // date.
-  if (displays_.size() == 0)
-    displays_ = screen_->GetAllDisplays();
   return displays_;
 }
 
@@ -115,7 +111,7 @@ mate::ObjectTemplateBuilder Screen::GetObjectTemplateBuilder(
 }
 
 // static
-v8::Handle<v8::Value> Screen::Create(v8::Isolate* isolate) {
+v8::Local<v8::Value> Screen::Create(v8::Isolate* isolate) {
   if (!Browser::Get()->is_ready()) {
     node::ThrowError("Cannot initialize \"screen\" module before app is ready");
     return v8::Null(isolate);
@@ -136,8 +132,8 @@ v8::Handle<v8::Value> Screen::Create(v8::Isolate* isolate) {
 
 namespace {
 
-void Initialize(v8::Handle<v8::Object> exports, v8::Handle<v8::Value> unused,
-                v8::Handle<v8::Context> context, void* priv) {
+void Initialize(v8::Local<v8::Object> exports, v8::Local<v8::Value> unused,
+                v8::Local<v8::Context> context, void* priv) {
   mate::Dictionary dict(context->GetIsolate(), exports);
   dict.Set("screen", atom::api::Screen::Create(context->GetIsolate()));
 }

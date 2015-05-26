@@ -72,6 +72,8 @@ You can also create a window without chrome by using
   * `type` String - Specifies the type of the window, possible types are
     `desktop`, `dock`, `toolbar`, `splash`, `notification`. This only works on
     Linux.
+  * `standard-window` Boolean - Uses the OS X's standard window instead of the
+    textured window. Defaults to `true`.
   * `web-preferences` Object - Settings of web page's features
     * `javascript` Boolean
     * `web-security` Boolean
@@ -176,6 +178,14 @@ Emitted when window enters full screen state.
 ### Event: 'leave-full-screen'
 
 Emitted when window leaves full screen state.
+
+### Event: 'enter-html-full-screen'
+
+Emitted when window enters full screen state triggered by html api.
+
+### Event: 'leave-html-full-screen'
+
+Emitted when window leaves full screen state triggered by html api.
 
 ### Event: 'devtools-opened'
 
@@ -533,6 +543,10 @@ up system's default printer and default settings for printing.
 Calling `window.print()` in web page is equivalent to call
 `BrowserWindow.print({silent: false, printBackground: false})`.
 
+**Note:** On Windows, the print API relies on `pdf.dll`. If your application
+doesn't need print feature, you can safely remove `pdf.dll` in saving binary
+size.
+
 ### BrowserWindow.loadUrl(url)
 
 Same with `webContents.loadUrl(url)`.
@@ -664,9 +678,11 @@ Corresponds to the points in time when the spinner of the tab stops spinning.
 * `httpResponseCode` Integer
 * `requestMethod` String
 * `referrer` String
+* `headers` String
 
 Emitted when details regarding a requested resource is available.
 `status` indicates the socket connection to download the resource.
+`headers` is key-value string separated by new-line character.
 
 ### Event: 'did-get-redirect-request'
 
@@ -722,6 +738,18 @@ Calling `event.preventDefault()` can prevent the navigation.
 
 Emitted when the renderer process is crashed.
 
+### Event: 'gpu-crashed'
+
+Emitted when the gpu process is crashed.
+
+### Event: 'plugin-crashed'
+
+* `event` Event
+* `name` String
+* `version` String
+
+Emitted when a plugin process is crashed.
+
 ### Event: 'destroyed'
 
 Emitted when the WebContents is destroyed.
@@ -740,10 +768,6 @@ Returns URL of current web page.
 ### WebContents.getTitle()
 
 Returns the title of web page.
-
-### WebContents.getFavicon()
-
-Returns the favicon of web page as [NativeImage](native-image.md).
 
 ### WebContents.isLoading()
 
@@ -779,6 +803,10 @@ Returns whether the web page can go forward.
 * `offset` Integer
 
 Returns whether the web page can go to `offset`.
+
+### WebContents.clearHistory()
+
+Clears the navigation history.
 
 ### WebContents.goBack()
 
@@ -841,6 +869,10 @@ Executes editing command `copy` in page.
 ### WebContents.paste()
 
 Executes editing command `paste` in page.
+
+### WebContents.pasteAndMatchStyle()
+
+Executes editing command `pasteAndMatchStyle` in page.
 
 ### WebContents.delete()
 

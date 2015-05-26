@@ -10,6 +10,7 @@
 #include "atom/browser/atom_browser_client.h"
 #include "atom/common/google_api_key.h"
 #include "atom/renderer/atom_renderer_client.h"
+#include "atom/utility/atom_content_utility_client.h"
 #include "base/command_line.h"
 #include "base/debug/stack_trace.h"
 #include "base/environment.h"
@@ -63,6 +64,10 @@ void AtomMainDelegate::PreSandboxStartup() {
   std::string process_type = command_line->GetSwitchValueASCII(
       switches::kProcessType);
 
+  if (process_type == switches::kUtilityProcess) {
+    AtomContentUtilityClient::PreSandboxStartup();
+  }
+
   // Only append arguments for browser process.
   if (!process_type.empty())
     return;
@@ -76,6 +81,9 @@ void AtomMainDelegate::PreSandboxStartup() {
 
   // Disable renderer sandbox for most of node's functions.
   command_line->AppendSwitch(switches::kNoSandbox);
+
+  // Allow file:// URIs to read other file:// URIs by default.
+  command_line->AppendSwitch(switches::kAllowFileAccessFromFiles);
 
 #if defined(OS_MACOSX)
   // Enable AVFoundation.
@@ -92,6 +100,11 @@ content::ContentRendererClient*
     AtomMainDelegate::CreateContentRendererClient() {
   renderer_client_.reset(new AtomRendererClient);
   return renderer_client_.get();
+}
+
+content::ContentUtilityClient* AtomMainDelegate::CreateContentUtilityClient() {
+  utility_client_.reset(new AtomContentUtilityClient);
+  return utility_client_.get();
 }
 
 scoped_ptr<brightray::ContentClient> AtomMainDelegate::CreateContentClient() {

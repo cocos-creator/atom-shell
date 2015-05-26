@@ -58,6 +58,21 @@ describe 'protocol module', ->
           assert false, 'Got error: ' + errorType + ' ' + error
           protocol.unregisterProtocol 'atom-string-job'
 
+    it 'returns RequestErrorJob should send error', (done) ->
+      data = 'valar morghulis'
+      job = new protocol.RequestErrorJob(-6)
+      handler = remote.createFunctionWithReturnValue job
+      protocol.registerProtocol 'atom-error-job', handler
+
+      $.ajax
+        url: 'atom-error-job://fake-host'
+        success: (response) ->
+          assert false, 'should not reach here'
+        error: (xhr, errorType, error) ->
+          assert errorType, 'error'
+          protocol.unregisterProtocol 'atom-error-job'
+          done()
+
     it 'returns RequestBufferJob should send buffer', (done) ->
       data = new Buffer("hello")
       job = new protocol.RequestBufferJob(data: data)
@@ -190,3 +205,31 @@ describe 'protocol module', ->
             assert false, 'Got error: ' + errorType + ' ' + error
             free()
       protocol.interceptProtocol 'file', handler
+
+    it 'can override http protocol handler', (done) ->
+      handler = remote.createFunctionWithReturnValue 'valar morghulis'
+      protocol.once 'intercepted', ->
+        protocol.uninterceptProtocol 'http'
+        done()
+      protocol.interceptProtocol 'http', handler
+
+    it 'can override https protocol handler', (done) ->
+      handler = remote.createFunctionWithReturnValue 'valar morghulis'
+      protocol.once 'intercepted', ->
+        protocol.uninterceptProtocol 'https'
+        done()
+      protocol.interceptProtocol 'https', handler
+
+    it 'can override ws protocol handler', (done) ->
+      handler = remote.createFunctionWithReturnValue 'valar morghulis'
+      protocol.once 'intercepted', ->
+        protocol.uninterceptProtocol 'ws'
+        done()
+      protocol.interceptProtocol 'ws', handler
+
+    it 'can override wss protocol handler', (done) ->
+      handler = remote.createFunctionWithReturnValue 'valar morghulis'
+      protocol.once 'intercepted', ->
+        protocol.uninterceptProtocol 'wss'
+        done()
+      protocol.interceptProtocol 'wss', handler

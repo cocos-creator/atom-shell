@@ -7,7 +7,7 @@
     'product_name%': 'Fireball',
     'company_name%': 'Firebox Technology',
     'company_abbr%': 'firebox',
-    'version%': '0.25.3',
+    'version%': '0.26.1',
 #     'app_sources': [
 #       'atom/app/atom_main.cc',
 #       'atom/app/atom_main.h',
@@ -494,7 +494,9 @@
                       '<@(libchromiumcontent_shared_v8_libraries)',
                     ],
                   }, {
-                    'copied_libraries': [],
+                    'copied_libraries': [
+                      '<(libchromiumcontent_dir)/pdf.dll',
+                    ],
                   }],
                 ],
               },
@@ -512,6 +514,9 @@
                 '<(libchromiumcontent_dir)/snapshot_blob.bin',
                 'external_binaries/d3dcompiler_47.dll',
                 'external_binaries/xinput1_3.dll',
+                'external_binaries/msvcp120.dll',
+                'external_binaries/msvcr120.dll',
+                'external_binaries/vccorlib120.dll',
               ],
             },
             {

@@ -9,6 +9,10 @@
 
 #include "brightray/browser/browser_client.h"
 
+namespace content {
+class QuotaPermissionContext;
+}
+
 namespace atom {
 
 class AtomResourceDispatcherHostDelegate;
@@ -17,6 +21,9 @@ class AtomBrowserClient : public brightray::BrowserClient {
  public:
   AtomBrowserClient();
   virtual ~AtomBrowserClient();
+
+  // Don't force renderer process to restart for once.
+  static void SuppressRendererProcessRestartForOnce();
 
  protected:
   // content::ContentBrowserClient:
@@ -35,6 +42,8 @@ class AtomBrowserClient : public brightray::BrowserClient {
       content::SiteInstance** new_instance);
   void AppendExtraCommandLineSwitches(base::CommandLine* command_line,
                                       int child_process_id) override;
+  void DidCreatePpapiPlugin(content::BrowserPpapiHost* browser_host) override;
+  content::QuotaPermissionContext* CreateQuotaPermissionContext() override;
 
  private:
   brightray::BrowserMainParts* OverrideCreateBrowserMainParts(

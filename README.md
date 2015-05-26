@@ -31,7 +31,7 @@ npm install electron-prebuilt --save-dev
 
 ### Mirrors
 
-- [China](https://npm.taobao.org/mirrors/atom-shell)
+- [China](https://npm.taobao.org/mirrors/electron)
 
 ## Documentation
 
@@ -43,6 +43,7 @@ contains documents describing how to build and contribute to Electron.
 
 There is an [`electron` category on the Atom forums](http://discuss.atom.io/category/electron)
 as well as an `#atom-shell` channel on Freenode.
+Check out [awesome-electron](https://github.com/sindresorhus/awesome-electron) for a community maintained list of useful example apps, tools and resources.
 
 ## Build Fire-shell
 

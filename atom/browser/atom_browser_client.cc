@@ -7,6 +7,7 @@
 #include "atom/browser/atom_access_token_store.h"
 #include "atom/browser/atom_browser_context.h"
 #include "atom/browser/atom_browser_main_parts.h"
+#include "atom/browser/atom_quota_permission_context.h"
 #include "atom/browser/atom_resource_dispatcher_host_delegate.h"
 #include "atom/browser/atom_speech_recognition_manager_delegate.h"
 #include "atom/browser/native_window.h"
@@ -16,18 +17,24 @@
 #include "base/command_line.h"
 #include "base/strings/string_number_conversions.h"
 #include "chrome/browser/printing/printing_message_filter.h"
+#include "chrome/browser/renderer_host/pepper/chrome_browser_pepper_host_factory.h"
 #include "chrome/browser/speech/tts_message_filter.h"
+#include "content/public/browser/browser_ppapi_host.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_view_host.h"
 #include "content/public/browser/resource_dispatcher_host.h"
 #include "content/public/browser/site_instance.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/web_preferences.h"
+#include "ppapi/host/ppapi_host.h"
 #include "ui/base/l10n/l10n_util.h"
 
 namespace atom {
 
 namespace {
+
+// Next navigation should not restart renderer process.
+bool g_suppress_renderer_process_restart = false;
 
 struct FindByProcessId {
   explicit FindByProcessId(int child_process_id)
@@ -47,6 +54,11 @@ struct FindByProcessId {
 };
 
 }  // namespace
+
+// static
+void AtomBrowserClient::SuppressRendererProcessRestartForOnce() {
+  g_suppress_renderer_process_restart = true;
+}
 
 AtomBrowserClient::AtomBrowserClient()
     : dying_render_process_(nullptr) {
@@ -113,8 +125,7 @@ void AtomBrowserClient::OverrideWebkitPrefs(
     return;
   }
 
-  NativeWindow* window = NativeWindow::FromRenderView(
-      process->GetID(), render_view_host->GetRoutingID());
+  NativeWindow* window = NativeWindow::FromWebContents(web_contents);
   if (window)
     window->OverrideWebkitPrefs(prefs);
 }
@@ -128,6 +139,11 @@ void AtomBrowserClient::OverrideSiteInstanceForNavigation(
     content::SiteInstance* current_instance,
     const GURL& url,
     content::SiteInstance** new_instance) {
+  if (g_suppress_renderer_process_restart) {
+    g_suppress_renderer_process_restart = false;
+    return;
+  }
+
   if (current_instance->HasProcess())
     dying_render_process_ = current_instance->GetProcess();
 
@@ -195,6 +211,20 @@ void AtomBrowserClient::AppendExtraCommandLineSwitches(
   }
 
   dying_render_process_ = nullptr;
+}
+
+void AtomBrowserClient::DidCreatePpapiPlugin(
+    content::BrowserPpapiHost* browser_host) {
+  auto command_line = base::CommandLine::ForCurrentProcess();
+  if (command_line->HasSwitch(switches::kEnablePlugins))
+    browser_host->GetPpapiHost()->AddHostFactoryFilter(
+        scoped_ptr<ppapi::host::HostFactory>(
+            new chrome::ChromeBrowserPepperHostFactory(browser_host)));
+}
+
+content::QuotaPermissionContext*
+    AtomBrowserClient::CreateQuotaPermissionContext() {
+  return new AtomQuotaPermissionContext;
 }
 
 brightray::BrowserMainParts* AtomBrowserClient::OverrideCreateBrowserMainParts(

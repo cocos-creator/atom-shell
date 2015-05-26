@@ -99,6 +99,8 @@ NativeWindow::NativeWindow(content::WebContents* web_contents,
       is_closed_(false),
       node_integration_(true),
       has_dialog_attached_(false),
+      html_fullscreen_(false),
+      native_fullscreen_(false),
       zoom_factor_(1.0),
       weak_factory_(this),
       inspectable_web_contents_(
@@ -169,18 +171,13 @@ NativeWindow* NativeWindow::Create(const mate::Dictionary& options) {
 }
 
 // static
-NativeWindow* NativeWindow::FromRenderView(int process_id, int routing_id) {
-  // Stupid iterating.
+NativeWindow* NativeWindow::FromWebContents(
+    content::WebContents* web_contents) {
   WindowList& window_list = *WindowList::GetInstance();
-  for (auto w = window_list.begin(); w != window_list.end(); ++w) {
-    auto& window = *w;
-    content::WebContents* web_contents = window->GetWebContents();
-    int window_process_id = web_contents->GetRenderProcessHost()->GetID();
-    int window_routing_id = web_contents->GetRoutingID();
-    if (window_routing_id == routing_id && window_process_id == process_id)
+  for (NativeWindow* window : window_list) {
+    if (window->GetWebContents() == web_contents)
       return window;
   }
-
   return nullptr;
 }
 
@@ -481,6 +478,25 @@ void NativeWindow::OverrideWebkitPrefs(content::WebPreferences* prefs) {
   }
 }
 
+void NativeWindow::SetHtmlApiFullscreen(bool enter_fullscreen) {
+  // Window is already in fullscreen mode, save the state.
+  if (enter_fullscreen && IsFullscreen()) {
+    native_fullscreen_ = true;
+    html_fullscreen_ = true;
+    return;
+  }
+
+  // Exit html fullscreen state but not window's fullscreen mode.
+  if (!enter_fullscreen && native_fullscreen_) {
+    html_fullscreen_ = false;
+    return;
+  }
+
+  SetFullScreen(enter_fullscreen);
+  html_fullscreen_ = enter_fullscreen;
+  native_fullscreen_ = false;
+}
+
 void NativeWindow::NotifyWindowClosed() {
   if (is_closed_)
     return;
@@ -527,6 +543,16 @@ void NativeWindow::NotifyWindowEnterFullScreen() {
 void NativeWindow::NotifyWindowLeaveFullScreen() {
   FOR_EACH_OBSERVER(NativeWindowObserver, observers_,
                     OnWindowLeaveFullScreen());
+}
+
+void NativeWindow::NotifyWindowEnterHtmlFullScreen() {
+  FOR_EACH_OBSERVER(NativeWindowObserver, observers_,
+                    OnWindowEnterHtmlFullScreen());
+}
+
+void NativeWindow::NotifyWindowLeaveHtmlFullScreen() {
+  FOR_EACH_OBSERVER(NativeWindowObserver, observers_,
+                    OnWindowLeaveHtmlFullScreen());
 }
 
 bool NativeWindow::ShouldCreateWebContents(
@@ -703,16 +729,16 @@ void NativeWindow::RendererResponsive(content::WebContents* source) {
 
 void NativeWindow::EnterFullscreenModeForTab(content::WebContents* source,
                                              const GURL& origin) {
-  SetFullScreen(true);
+  SetHtmlApiFullscreen(true);
 }
 
 void NativeWindow::ExitFullscreenModeForTab(content::WebContents* source) {
-  SetFullScreen(false);
+  SetHtmlApiFullscreen(false);
 }
 
 bool NativeWindow::IsFullscreenForTabOrPending(
     const content::WebContents* source) const {
-  return IsFullscreen();
+  return is_html_api_fullscreen();
 }
 
 void NativeWindow::BeforeUnloadFired(const base::TimeTicks& proceed_time) {

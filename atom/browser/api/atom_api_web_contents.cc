@@ -6,6 +6,7 @@
 
 #include <set>
 
+#include "atom/browser/atom_browser_client.h"
 #include "atom/browser/atom_browser_context.h"
 #include "atom/browser/atom_javascript_dialog_manager.h"
 #include "atom/browser/native_window.h"
@@ -21,8 +22,10 @@
 #include "brightray/browser/inspectable_web_contents.h"
 #include "brightray/browser/media/media_stream_devices_controller.h"
 #include "content/public/browser/favicon_status.h"
+#include "content/public/browser/guest_host.h"
 #include "content/public/browser/navigation_details.h"
 #include "content/public/browser/navigation_entry.h"
+#include "content/public/browser/plugin_service.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_view_host.h"
@@ -35,6 +38,7 @@
 #include "native_mate/callback.h"
 #include "native_mate/dictionary.h"
 #include "native_mate/object_template_builder.h"
+#include "net/url_request/url_request_context.h"
 
 #include "atom/common/node_includes.h"
 
@@ -50,9 +54,7 @@ v8::Persistent<v8::ObjectTemplate> template_;
 NativeWindow* GetWindowFromGuest(const content::WebContents* guest) {
   WebViewManager::WebViewInfo info;
   if (WebViewManager::GetInfoForProcess(guest->GetRenderProcessHost(), &info))
-    return NativeWindow::FromRenderView(
-        info.embedder->GetRenderProcessHost()->GetID(),
-        info.embedder->GetRoutingID());
+    return NativeWindow::FromWebContents(info.embedder);
   else
     return nullptr;
 }
@@ -80,7 +82,7 @@ WebContents::WebContents(content::WebContents* web_contents)
       guest_instance_id_(-1),
       element_instance_id_(-1),
       guest_opaque_(true),
-      guest_sizer_(nullptr),
+      guest_host_(nullptr),
       auto_size_enabled_(false) {
 }
 
@@ -88,7 +90,7 @@ WebContents::WebContents(const mate::Dictionary& options)
     : guest_instance_id_(-1),
       element_instance_id_(-1),
       guest_opaque_(true),
-      guest_sizer_(nullptr),
+      guest_host_(nullptr),
       auto_size_enabled_(false) {
   options.Get("guestInstanceId", &guest_instance_id_);
 
@@ -214,6 +216,36 @@ void WebContents::HandleKeyboardEvent(
       web_contents(), event);
 }
 
+void WebContents::EnterFullscreenModeForTab(content::WebContents* source,
+                                            const GURL& origin) {
+  auto window = GetWindowFromGuest(source);
+  if (window) {
+    window->SetHtmlApiFullscreen(true);
+    window->NotifyWindowEnterHtmlFullScreen();
+    source->GetRenderViewHost()->WasResized();
+    Emit("enter-html-full-screen");
+  }
+}
+
+void WebContents::ExitFullscreenModeForTab(content::WebContents* source) {
+  auto window = GetWindowFromGuest(source);
+  if (window) {
+    window->SetHtmlApiFullscreen(false);
+    window->NotifyWindowLeaveHtmlFullScreen();
+    source->GetRenderViewHost()->WasResized();
+    Emit("leave-html-full-screen");
+  }
+}
+
+bool WebContents::IsFullscreenForTabOrPending(
+    const content::WebContents* source) const {
+  auto window = GetWindowFromGuest(source);
+  if (window)
+    return window->is_html_api_fullscreen();
+  else
+    return false;
+}
+
 void WebContents::RenderViewDeleted(content::RenderViewHost* render_view_host) {
   Emit("render-view-deleted",
        render_view_host->GetProcess()->GetID(),
@@ -222,6 +254,19 @@ void WebContents::RenderViewDeleted(content::RenderViewHost* render_view_host) {
 
 void WebContents::RenderProcessGone(base::TerminationStatus status) {
   Emit("crashed");
+}
+
+void WebContents::PluginCrashed(const base::FilePath& plugin_path,
+                                base::ProcessId plugin_pid) {
+  content::WebPluginInfo info;
+  auto plugin_service = content::PluginService::GetInstance();
+  plugin_service->GetPluginInfoByPath(plugin_path, &info);
+  Emit("plugin-crashed", info.name, info.version);
+}
+
+void WebContents::OnGpuProcessCrashed(base::TerminationStatus exit_code) {
+  if (exit_code == base::TERMINATION_STATUS_PROCESS_CRASHED)
+    Emit("gpu-crashed");
 }
 
 void WebContents::DocumentLoadedInFrame(
@@ -255,11 +300,11 @@ void WebContents::DidFailLoad(content::RenderFrameHost* render_frame_host,
   Emit("did-fail-load", error_code, error_description);
 }
 
-void WebContents::DidStartLoading(content::RenderViewHost* render_view_host) {
+void WebContents::DidStartLoading() {
   Emit("did-start-loading");
 }
 
-void WebContents::DidStopLoading(content::RenderViewHost* render_view_host) {
+void WebContents::DidStopLoading() {
   Emit("did-stop-loading");
 }
 
@@ -348,8 +393,9 @@ void WebContents::WebContentsDestroyed() {
 }
 
 void WebContents::NavigationEntryCommitted(
-    const content::LoadCommittedDetails& load_details) {
-  Emit("navigation-entry-commited", load_details.entry->GetURL());
+    const content::LoadCommittedDetails& details) {
+  Emit("navigation-entry-commited", details.entry->GetURL(),
+       details.is_in_page, details.did_replace_entry);
 }
 
 void WebContents::DidAttach(int guest_proxy_routing_id) {
@@ -361,7 +407,7 @@ void WebContents::ElementSizeChanged(const gfx::Size& size) {
 
   // Only resize if needed.
   if (!size.IsEmpty())
-    guest_sizer_->SizeContents(size);
+    guest_host_->SizeContents(size);
 }
 
 content::WebContents* WebContents::GetOwnerWebContents() const {
@@ -375,13 +421,8 @@ void WebContents::GuestSizeChanged(const gfx::Size& new_size) {
   guest_size_ = new_size;
 }
 
-void WebContents::RegisterDestructionCallback(
-    const DestructionCallback& callback) {
-  destruction_callback_ = callback;
-}
-
-void WebContents::SetGuestSizer(content::GuestSizer* guest_sizer) {
-  guest_sizer_ = guest_sizer;
+void WebContents::SetGuestHost(content::GuestHost* guest_host) {
+  guest_host_ = guest_host;
 }
 
 void WebContents::WillAttach(content::WebContents* embedder_web_contents,
@@ -393,11 +434,12 @@ void WebContents::WillAttach(content::WebContents* embedder_web_contents,
 
 void WebContents::Destroy() {
   if (storage_) {
-    if (!destruction_callback_.is_null())
-      destruction_callback_.Run();
-
     // When force destroying the "destroyed" event is not emitted.
     WebContentsDestroyed();
+
+    // Give the content module an opportunity to perform some cleanup.
+    guest_host_->WillDestroy();
+    guest_host_ = nullptr;
 
     Observe(nullptr);
     storage_.reset();
@@ -416,6 +458,10 @@ void WebContents::LoadURL(const GURL& url, const mate::Dictionary& options) {
     params.referrer = content::Referrer(http_referrer.GetAsReferrer(),
                                         blink::WebReferrerPolicyDefault);
 
+  std::string user_agent;
+  if (options.Get("useragent", &user_agent))
+    SetUserAgent(user_agent);
+
   params.transition_type = ui::PAGE_TRANSITION_TYPED;
   params.should_clear_history_list = true;
   params.override_user_agent = content::NavigationController::UA_OVERRIDE_TRUE;
@@ -424,13 +470,6 @@ void WebContents::LoadURL(const GURL& url, const mate::Dictionary& options) {
 
 base::string16 WebContents::GetTitle() const {
   return web_contents()->GetTitle();
-}
-
-gfx::Image WebContents::GetFavicon() const {
-  auto entry = web_contents()->GetController().GetLastCommittedEntry();
-  if (!entry)
-    return gfx::Image();
-  return entry->GetFavicon().image;
 }
 
 bool WebContents::IsLoading() const {
@@ -447,6 +486,21 @@ void WebContents::Stop() {
 
 void WebContents::ReloadIgnoringCache() {
   web_contents()->GetController().ReloadIgnoringCache(false);
+}
+
+void WebContents::GoBack() {
+  atom::AtomBrowserClient::SuppressRendererProcessRestartForOnce();
+  web_contents()->GetController().GoBack();
+}
+
+void WebContents::GoForward() {
+  atom::AtomBrowserClient::SuppressRendererProcessRestartForOnce();
+  web_contents()->GetController().GoForward();
+}
+
+void WebContents::GoToOffset(int offset) {
+  atom::AtomBrowserClient::SuppressRendererProcessRestartForOnce();
+  web_contents()->GetController().GoToOffset(offset);
 }
 
 int WebContents::GetRoutingID() const {
@@ -511,6 +565,10 @@ void WebContents::Copy() {
 
 void WebContents::Paste() {
   web_contents()->Paste();
+}
+
+void WebContents::PasteAndMatchStyle() {
+  web_contents()->PasteAndMatchStyle();
 }
 
 void WebContents::Delete() {
@@ -613,11 +671,13 @@ mate::ObjectTemplateBuilder WebContents::GetObjectTemplateBuilder(
         .SetMethod("isAlive", &WebContents::IsAlive)
         .SetMethod("_loadUrl", &WebContents::LoadURL)
         .SetMethod("getTitle", &WebContents::GetTitle)
-        .SetMethod("getFavicon", &WebContents::GetFavicon)
         .SetMethod("isLoading", &WebContents::IsLoading)
         .SetMethod("isWaitingForResponse", &WebContents::IsWaitingForResponse)
         .SetMethod("_stop", &WebContents::Stop)
         .SetMethod("_reloadIgnoringCache", &WebContents::ReloadIgnoringCache)
+        .SetMethod("_goBack", &WebContents::GoBack)
+        .SetMethod("_goForward", &WebContents::GoForward)
+        .SetMethod("_goToOffset", &WebContents::GoToOffset)
         .SetMethod("getRoutingId", &WebContents::GetRoutingID)
         .SetMethod("getProcessId", &WebContents::GetProcessID)
         .SetMethod("isCrashed", &WebContents::IsCrashed)
@@ -633,6 +693,7 @@ mate::ObjectTemplateBuilder WebContents::GetObjectTemplateBuilder(
         .SetMethod("cut", &WebContents::Cut)
         .SetMethod("copy", &WebContents::Copy)
         .SetMethod("paste", &WebContents::Paste)
+        .SetMethod("pasteAndMatchStyle", &WebContents::PasteAndMatchStyle)
         .SetMethod("delete", &WebContents::Delete)
         .SetMethod("selectAll", &WebContents::SelectAll)
         .SetMethod("unselect", &WebContents::Unselect)
@@ -690,8 +751,8 @@ mate::Handle<WebContents> WebContents::Create(
 
 namespace {
 
-void Initialize(v8::Handle<v8::Object> exports, v8::Handle<v8::Value> unused,
-                v8::Handle<v8::Context> context, void* priv) {
+void Initialize(v8::Local<v8::Object> exports, v8::Local<v8::Value> unused,
+                v8::Local<v8::Context> context, void* priv) {
   v8::Isolate* isolate = context->GetIsolate();
   mate::Dictionary dict(isolate, exports);
   dict.SetMethod("create", &atom::api::WebContents::Create);

@@ -3,7 +3,7 @@
 The `remote` module provides a simple way to do inter-process communication
 between the renderer process and the main process.
 
-In Electron, only GUI-related modules are available in the renderer process.
+In Electron, only GUI-unrelated modules are available in the renderer process.
 Without the `remote` module, users who wanted to call a main process API in
 the renderer process would have to explicitly send inter-process messages
 to the main process. With the `remote` module, users can invoke methods of
@@ -49,7 +49,7 @@ Primary value types like strings and numbers, however, are sent by copy.
 
 ## Passing callbacks to the main process
 
-Some APIs in the main process accept callbacks, and it would be attempting to
+Some APIs in the main process accept callbacks, and it would be tempting to
 pass callbacks when calling a remote function. The `remote` module does support
 doing this, but you should also be extremely careful with this.
 
@@ -137,6 +137,10 @@ Returns the object returned by `require(module)` in the main process.
 
 Returns the [BrowserWindow](browser-window.md) object which this web page
 belongs to.
+
+## remote.getCurrentWebContent()
+
+Returns the WebContents object of this web page.
 
 ## remote.getGlobal(name)
 

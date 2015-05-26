@@ -1,3 +1,12 @@
+ipc = require 'ipc'
+
+# The history operation in renderer is redirected to browser.
+ipc.on 'ATOM_SHELL_NAVIGATION_CONTROLLER', (event, method, args...) ->
+  event.sender[method] args...
+
+ipc.on 'ATOM_SHELL_SYNC_NAVIGATION_CONTROLLER', (event, method, args...) ->
+  event.returnValue = event.sender[method] args...
+
 # JavaScript implementation of Chromium's NavigationController.
 # Instead of relying on Chromium for history control, we compeletely do history
 # control on user land, and only rely on WebContents.loadUrl for navigation.
@@ -5,20 +14,28 @@
 # process is restarted everytime.
 class NavigationController
   constructor: (@webContents) ->
-    @history = []
-    @currentIndex = -1
-    @pendingIndex = -1
+    @clearHistory()
 
-    @webContents.on 'navigation-entry-commited', (event, url) =>
-      if @pendingIndex is -1  # Normal navigation.
-        @history = @history.slice 0, @currentIndex + 1  # Clear history.
-        if @history[@currentIndex] isnt url
-          @currentIndex++
-          @history.push url
-      else  # Go to index.
+    @webContents.on 'navigation-entry-commited', (event, url, inPage, replaceEntry) =>
+      if @inPageIndex > -1 and not inPage
+        # Navigated to a new page, clear in-page mark.
+        @inPageIndex = -1
+      else if @inPageIndex is -1 and inPage
+        # Started in-page navigations.
+        @inPageIndex = @currentIndex
+
+      if @pendingIndex >= 0 # Go to index.
         @currentIndex = @pendingIndex
         @pendingIndex = -1
         @history[@currentIndex] = url
+      else if replaceEntry # Non-user initialized navigation.
+        @history[@currentIndex] = url
+      else  # Normal navigation.
+        @history = @history.slice 0, @currentIndex + 1  # Clear history.
+        currentEntry = @history[@currentIndex]
+        if currentEntry?.url isnt url
+          @currentIndex++
+          @history.push url
 
   loadUrl: (url, options={}) ->
     @pendingIndex = -1
@@ -54,15 +71,27 @@ class NavigationController
   canGoToOffset: (offset) ->
     @canGoToIndex @currentIndex + offset
 
+  clearHistory: ->
+    @history = []
+    @currentIndex = -1
+    @pendingIndex = -1
+    @inPageIndex = -1
+
   goBack: ->
     return unless @canGoBack()
     @pendingIndex = @getActiveIndex() - 1
-    @webContents._loadUrl @history[@pendingIndex], {}
+    if @inPageIndex > -1 and @pendingIndex >= @inPageIndex
+      @webContents._goBack()
+    else
+      @webContents._loadUrl @history[@pendingIndex], {}
 
   goForward: ->
     return unless @canGoForward()
     @pendingIndex = @getActiveIndex() + 1
-    @webContents._loadUrl @history[@pendingIndex], {}
+    if @inPageIndex > -1 and @pendingIndex >= @inPageIndex
+      @webContents._goForward()
+    else
+      @webContents._loadUrl @history[@pendingIndex], {}
 
   goToIndex: (index) ->
     return unless @canGoToIndex index
@@ -71,9 +100,17 @@ class NavigationController
 
   goToOffset: (offset) ->
     return unless @canGoToOffset offset
-    @goToIndex @currentIndex + offset
+    pendingIndex = @currentIndex + offset
+    if @inPageIndex > -1 and pendingIndex >= @inPageIndex
+      @pendingIndex = pendingIndex
+      @webContents._goToOffset offset
+    else
+      @goToIndex pendingIndex
 
   getActiveIndex: ->
     if @pendingIndex is -1 then @currentIndex else @pendingIndex
+
+  length: ->
+    @history.length
 
 module.exports = NavigationController
